@@ -1,5 +1,19 @@
 [
   {
+    "user_id": "adm_e330426528dd",
+    "email": "santrasankhadip640@gmail.com",
+    "name": "Sankhadip",
+    "role": "admin",
+    "password_hash": "***",
+    "picture": null,
+    "points": 0,
+    "badges": [],
+    "institute": "HITK",
+    "phone": null,
+    "profile_complete": true,
+    "created_at": "2026-05-12T16:52:56.538000"
+  },
+  {
     "user_id": "stu_9498ec39f753",
     "email": "ssankhadip41@gmail.com",
     "name": "Sankhadip Santra",
