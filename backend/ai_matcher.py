@@ -4,7 +4,7 @@ import json
 import re
 import logging
 from typing import List, Dict
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+# from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +35,8 @@ def _heuristic_score(lost: Dict, found: Dict) -> int:
     return min(100, score)
 
 
-async def ai_match_lost_to_found(lost: Dict, candidates: List[Dict]) -> List[Dict]:
-    """Return a ranked list of matches with similarity and reasoning.
-    Falls back to heuristic scoring if LLM call fails."""
-    if not candidates:
-        return []
+async def ai_match_lost_to_found(*args, **kwargs):
+    return []
 
     api_key = os.environ.get("EMERGENT_LLM_KEY")
     if not api_key:

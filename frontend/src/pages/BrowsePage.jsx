@@ -12,25 +12,42 @@ export default function BrowsePage() {
   const [q, setQ] = useState('')
   const [category, setCategory] = useState('')
 
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    const params = { limit: 60 }
-    if (q) params.q = q
-    if (category) params.category = category
-    const id = setTimeout(async () => {
-      try {
-        const { data } = await api.get('/items/found', { params })
-        if (!cancelled) setItems(data || [])
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }, 250)
-    return () => {
-      clearTimeout(id)
-      cancelled = true
+useEffect(() => {
+  let cancelled = false
+  setLoading(true)
+
+  const params = { limit: 60 }
+  if (q) params.q = q
+  if (category) params.category = category
+
+  const id = setTimeout(async () => {
+    try {
+      const res = await api.get('/items/found', { params })
+      const data = res.data
+
+      const list =
+        Array.isArray(data)
+          ? data
+          : Array.isArray(data?.items)
+            ? data.items
+            : Array.isArray(data?.data)
+              ? data.data
+              : []
+
+      if (!cancelled) setItems(list)
+    } catch (err) {
+      console.error("Browse API error:", err)
+      if (!cancelled) setItems([])
+    } finally {
+      if (!cancelled) setLoading(false)
     }
-  }, [q, category])
+  }, 250)
+
+  return () => {
+    clearTimeout(id)
+    cancelled = true
+  }
+}, [q, category])
 
   const empty = !loading && !items.length
 
@@ -89,7 +106,7 @@ export default function BrowsePage() {
       )}
       {!loading && items.length > 0 && (
         <div data-testid="browse-grid" className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {items.map((it) => <ItemCard key={it.item_id} item={it} testidPrefix="browse" />)}
+          {Array.isArray(items) && items.map((it) => <ItemCard key={it.item_id} item={it} testidPrefix="browse" />)}
         </div>
       )}
     </div>

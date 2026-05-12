@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../lib/api'
 import { useAuth } from '../context/AuthContext'
-import { ArrowRight, Sparkles, ShieldCheck, MapPin, BellRing, QrCode, Award, Search, Package, AlertTriangle } from 'lucide-react'
+import {ArrowRight,Search,Plus,ShieldCheck,MapPin,QrCode,Sparkles,Building2,Phone,BellRing,Award,Package,AlertTriangle} from "lucide-react";
 import ItemCard from '../components/ItemCard.jsx'
 import LostNoticeList from '../components/LostNoticeList.jsx'
 import { SectionTitle, Spinner } from '../components/Common.jsx'
@@ -25,15 +25,20 @@ export default function HomePage() {
           api.get('/centres', { params: centresParams }),
         ])
         if (cancelled) return
-        let centresList = c.data || []
+
+        const foundData = a?.data
+        const lostData = b?.data
+
+        let centresList = c?.data || []
         if (isStudent && user?.institute && centresList.length === 0) {
           // Fallback: show all centres if none for this institute
           const all = await api.get('/centres')
-          centresList = all.data || []
+          centresList = all?.data || []
         }
-        setFoundItems(a.data || [])
-        setLostNotices(b.data || [])
-        setCentres(centresList)
+
+        setFoundItems(Array.isArray(foundData) ? foundData : (foundData?.items || []))
+        setLostNotices(Array.isArray(lostData) ? lostData : (lostData?.items || []))
+        setCentres(Array.isArray(centresList) ? centresList : [])
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -94,7 +99,7 @@ export default function HomePage() {
                 </div>
                 <ol className="mt-5 space-y-4">
                   {[
-                    { icon: BellRing, t: 'Students report what they lost', d: 'A description, location, date — that\'s it.' },
+                    { icon: BellRing, t: 'Students report a claim/what they lost', d: 'A description, location, date — that\'s it.' },
                     { icon: ShieldCheck, t: 'Admins log items handed in physically', d: 'Each item gets a QR + the finder\'s roll number (hidden from public).' },
                     { icon: Award, t: 'AI suggests a match · Owner claims with proof', d: 'When item is collected, the finder earns a badge in 24 hrs.' },
                   ].map((s, i) => (
@@ -140,9 +145,15 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5" data-testid="home-found-grid">
-            {foundItems.slice(0, 8).map((it) => (
-              <ItemCard key={it.item_id} item={it} testidPrefix="home-found" />
-            ))}
+            {(Array.isArray(foundItems) ? foundItems : [])
+    .slice(0, 8)
+    .map((it) => (
+      <ItemCard
+        key={it.item_id}
+        item={it}
+        testidPrefix="home-found"
+      />
+    ))}
           </div>
         )}
       </section>
@@ -231,6 +242,88 @@ export default function HomePage() {
           </div>
         )}
       </section>
+      <section className="bg-secondary/40 py-20">
+  <div className="container">
+    <div className="mx-auto mb-12 max-w-2xl text-center">
+      <h2 className="font-display text-3xl font-bold md:text-4xl">
+        A trusted way to recover what's yours
+      </h2>
+      <p className="mt-3 text-muted-foreground">
+        Built for campuses with security, transparency, and speed in mind.
+      </p>
+    </div>
+
+    <div className="grid gap-6 md:grid-cols-3">
+      {[
+        {
+          icon: ShieldCheck,
+          title: "Verified claims",
+          body: "Multi-step proof, lock-screen checks and admin review prevent fraudulent claims."
+        },
+        {
+          icon: MapPin,
+          title: "Location-aware",
+          body: "Items are organized by building and location so the right people see them first."
+        },
+        {
+          icon: QrCode,
+          title: "Unique QR + ID",
+          body: "Every item gets a tracking code and QR for fast retrieval and storage."
+        },
+      ].map((f) => (
+        <div
+          key={f.title}
+          className="border-border/60 p-6 shadow-soft transition-base hover:shadow-elegant rounded-xl bg-white"
+        >
+          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+            <f.icon className="h-5 w-5" />
+          </div>
+
+          <h3 className="mb-2 font-display text-lg font-semibold">
+            {f.title}
+          </h3>
+
+          <p className="text-sm text-muted-foreground">
+            {f.body}
+          </p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+<section className="container py-24">
+  <div className="container">
+
+    <div className="rounded-3xl bg-blue-500 p-12 text-center shadow-xl md:p-16">
+      
+      <h2 className="font-display text-3xl font-bold text-white md:text-4xl">
+        Ready to recover what's yours?
+      </h2>
+
+      <p className="mx-auto mt-3 max-w-xl text-white/80">
+        Join your campus community in keeping belongings safe.
+      </p>
+
+      <div className="mt-6 flex flex-wrap justify-center gap-3">
+
+        <Link to="/student">
+          <button className="px-6 py-3 rounded-lg bg-white text-blue-700 font-semibold hover:bg-blue-100 transition">
+            Create account
+          </button>
+        </Link>
+
+        <Link to="/browse">
+          <button className="px-6 py-3 rounded-lg border border-white text-white hover:bg-white/10 transition">
+            Browse items
+          </button>
+        </Link>
+
+      </div>
+
+    </div>
+
+  </div>
+</section>
     </div>
   )
 }

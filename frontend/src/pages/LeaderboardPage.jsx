@@ -7,9 +7,26 @@ export default function LeaderboardPage() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    api.get('/leaderboard').then(({ data }) => setUsers(data || [])).finally(() => setLoading(false))
-  }, [])
+ useEffect(() => {
+  api.get('/leaderboard')
+    .then((res) => {
+      const data = res.data
+
+      // handle different API shapes safely
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.users)
+          ? data.users
+          : []
+
+      setUsers(list)
+    })
+    .catch((err) => {
+      console.error(err)
+      setUsers([])
+    })
+    .finally(() => setLoading(false))
+}, [])
 
   const medals = ['from-amber-400 to-amber-600', 'from-slate-400 to-slate-500', 'from-orange-400 to-orange-600']
 
@@ -25,7 +42,7 @@ export default function LeaderboardPage() {
         <EmptyState icon={Trophy} title="No heroes yet" body="Be the first to earn points by reuniting an item." testid="leaderboard-empty" />
       )}
       <div className="space-y-3">
-        {users.map((u, i) => (
+        {Array.isArray(users) && users.map((u, i) => (
           <div
             key={i}
             data-testid={`leader-row-${i}`}

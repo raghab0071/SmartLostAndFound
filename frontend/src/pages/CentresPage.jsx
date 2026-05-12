@@ -11,10 +11,30 @@ export default function CentresPage() {
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
 
-  useEffect(() => {
-    setLoading(true)
-    api.get('/centres').then(({ data }) => setCentres(data || [])).finally(() => setLoading(false))
-  }, [])
+useEffect(() => {
+  setLoading(true)
+
+  api.get('/centres')
+    .then((res) => {
+      const data = res.data
+
+      const list =
+        Array.isArray(data)
+          ? data
+          : Array.isArray(data?.centres)
+            ? data.centres
+            : Array.isArray(data?.data)
+              ? data.data
+              : []
+
+      setCentres(list)
+    })
+    .catch((err) => {
+      console.error("Centres API error:", err)
+      setCentres([])
+    })
+    .finally(() => setLoading(false))
+}, [])
 
   const filter = (c) => {
     if (!q) return true

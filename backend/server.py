@@ -44,6 +44,29 @@ db = client[DB_NAME]
 
 app = FastAPI(title="Smart Lost & Found Ecosystem API")
 api = APIRouter(prefix="/api")
+from auth import verify_password, create_admin_token
+from fastapi import HTTPException
+
+@app.post("/admin/login")
+async def admin_login(data: dict):
+    user = await db.users.find_one({"email": data["email"]})
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not verify_password(data["password"], user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    token = create_admin_token(user["user_id"], user["email"])
+
+    return {
+        "token": token,
+        "user": {
+            "user_id": user["user_id"],
+            "email": user["email"],
+            "role": user["role"]
+        }
+    }
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s :: %(message)s")
 logger = logging.getLogger(__name__)
