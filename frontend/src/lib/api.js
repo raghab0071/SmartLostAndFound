@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-export const API_BASE = import.meta.env.VITE_REACT_APP_BACKEND_URL ||'https://smartlostandfound.onrender.com'
+const API_BASE = import.meta.env.VITE_REACT_APP_BACKEND_URL
 
 const api = axios.create({
   baseURL: `${API_BASE}/api`,
