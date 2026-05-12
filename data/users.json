@@ -1,0 +1,29 @@
+[
+  {
+    "user_id": "adm_bc50f4ea0792",
+    "email": "msayantika70@gmail.com",
+    "name": "SANKHA",
+    "role": "admin",
+    "password_hash": "***",
+    "picture": null,
+    "points": 0,
+    "badges": [],
+    "created_at": "2026-05-11T22:24:17.827000"
+  },
+  {
+    "user_id": "adm_a78391fa403f",
+    "email": "admin@campus.edu",
+    "name": "Campus Admin",
+    "picture": null,
+    "role": "admin",
+    "password_hash": "***",
+    "points": 0,
+    "badges": [
+      "Trusted Admin"
+    ],
+    "created_at": "2026-05-11T20:57:40.806000",
+    "institute": "HERITAGE INSTITUTE OF TCHNOLOGY",
+    "phone": "8670203075",
+    "profile_complete": true
+  }
+]
