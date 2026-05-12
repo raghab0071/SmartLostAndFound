@@ -1,0 +1,29 @@
+[
+  {
+    "user_id": "stu_9498ec39f753",
+    "email": "ssankhadip41@gmail.com",
+    "name": "Sankhadip Santra",
+    "picture": "https://lh3.googleusercontent.com/a/ACg8ocK4THRlhLfK7TKd0kPtcHAs5_Iad0CL3sXMetR37pem23FoPuO_=s96-c",
+    "role": "student",
+    "points": 0,
+    "badges": [],
+    "institute": "HERITAGE INSTITUTE OF TECHNOLOGY",
+    "roll_no": "2451166",
+    "phone": null,
+    "profile_complete": true,
+    "created_at": "2026-05-12T12:37:03.643000"
+  },
+  {
+    "user_id": "adm_1e1ca21eb374",
+    "email": "admin@campus.edu",
+    "name": "Campus Admin",
+    "picture": null,
+    "role": "admin",
+    "password_hash": "***",
+    "points": 0,
+    "badges": [],
+    "institute": "Demo Institute",
+    "profile_complete": true,
+    "created_at": "2026-05-12T12:20:39.239000"
+  }
+]
