@@ -13,7 +13,7 @@ from typing import Iterable
 
 logger = logging.getLogger(__name__)
 
-MIRROR_DIR = Path(os.environ.get("JSON_MIRROR_DIR", "/app/data"))
+MIRROR_DIR = Path(os.environ.get("JSON_MIRROR_DIR", "./data"))
 MIRROR_DIR.mkdir(parents=True, exist_ok=True)
 
 # Collections to mirror. Exclude session tokens & matches for noise/privacy.
