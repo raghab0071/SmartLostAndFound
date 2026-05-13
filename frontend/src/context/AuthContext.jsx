@@ -83,7 +83,7 @@ export function AuthProvider({ children }) {
 
   const loginStudentWithGoogle = (redirectPath = '/student') => {
     sessionStorage.setItem('post_login_redirect', redirectPath)
-    const redirectUrl = `${window.location.origin}/profile`
+    const redirectUrl = `${window.location.origin}/`
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`
   }
 

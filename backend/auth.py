@@ -81,19 +81,19 @@ async def _get_user_by_session_token(token: str, db) -> Optional[dict]:
 
 async def get_current_user_optional(request: Request) -> Optional[dict]:
     from server import db  # late import to avoid circular
-    # 1. Try session_token cookie
-    token = request.cookies.get("session_token")
-    if token:
-        user = await _get_user_by_session_token(token, db)
-        if user:
-            return user
-    # 2. Try bearer token (JWT for admins, or session_token)
+    # 1. Prefer bearer token first so admin credentials win over stale student cookies.
     bearer = _bearer_token(request)
     if bearer:
         user = await _get_user_by_jwt_token(bearer, db)
         if user:
             return user
         user = await _get_user_by_session_token(bearer, db)
+        if user:
+            return user
+    # 2. Try session_token cookie
+    token = request.cookies.get("session_token")
+    if token:
+        user = await _get_user_by_session_token(token, db)
         if user:
             return user
     return None
