@@ -957,18 +957,23 @@ async def on_startup():
         logger.warning(f"Initial JSON mirror failed: {e}")
 
 
-app.include_router(api)
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://smart-lost-and-found-1phw.vercel.app",
+        "https://smart-lost-and-found-wine.vercel.app",
+        "https://smartlostandfound.onrender.com",
+        "http://localhost:3000",
         "http://localhost:5173",
-        "https://smart-lost-and-found-1phw.vercel.app"
+        "http://127.0.0.1:3000",
     ],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1):(3000|5173)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(api)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
