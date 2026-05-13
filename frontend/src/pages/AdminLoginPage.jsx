@@ -3,10 +3,9 @@ import { useAuth } from '../context/AuthContext'
 import { Navigate, Link, useNavigate } from 'react-router-dom'
 import { ShieldCheck, Lock, Mail, User as UserIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
-import api from '../lib/api'
 
 export default function AdminLoginPage() {
-  const { user, loginAdmin } = useAuth()
+  const { user, loginAdmin, registerAdmin } = useAuth()
   const navigate = useNavigate()
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('admin@campus.edu')
@@ -26,10 +25,9 @@ export default function AdminLoginPage() {
         toast.success('Welcome back, admin!')
         navigate('/admin')
       } else {
-        const { data } = await api.post('/auth/admin/register', { email, password, name })
-        localStorage.setItem('admin_token', data.access_token)
+        await registerAdmin(email, password, name)
         toast.success('Admin account created!')
-        window.location.href = '/admin'
+        navigate('/admin')
       }
     } catch (err) {
       toast.error(err.message || 'Authentication failed')

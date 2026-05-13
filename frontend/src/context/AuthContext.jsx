@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../lib/api'
@@ -16,7 +16,8 @@ export function AuthProvider({ children }) {
       const { data } = await api.get('/auth/me')
       setUser(data.user)
       return data.user
-    } catch {
+    } catch (err) {
+      console.error('fetchMe error:', err.message)
       setUser(null)
       return null
     }
@@ -32,7 +33,8 @@ export function AuthProvider({ children }) {
       const { data } = await api.get('/admin/onboarding-status')
       setOnboardingState(data)
       return data
-    } catch {
+    } catch (err) {
+      console.error('refreshOnboarding error:', err.message)
       return null
     }
   }, [user])
@@ -41,32 +43,38 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let cancelled = false
     async function bootstrap() {
-      const hash = window.location.hash || ''
-      if (hash.includes('session_id=')) {
-        const params = new URLSearchParams(hash.replace(/^#/, ''))
-        const sessionId = params.get('session_id')
-        if (sessionId) {
-          try {
-            const { data } = await api.post('/auth/google/session', { session_id: sessionId })
-            if (!cancelled) {
-              setUser(data.user)
-              toast.success(`Welcome, ${data.user.name}!`)
-              const redirect = sessionStorage.getItem('post_login_redirect') || '/student'
-              sessionStorage.removeItem('post_login_redirect')
+      try {
+        const hash = window.location.hash || ''
+        if (hash.includes('session_id=')) {
+          const params = new URLSearchParams(hash.replace(/^#/, ''))
+          const sessionId = params.get('session_id')
+          if (sessionId) {
+            try {
+              const { data } = await api.post('/auth/google/session', { session_id: sessionId })
+              if (!cancelled) {
+                setUser(data.user)
+                toast.success(`Welcome, ${data.user.name}!`)
+                const redirect = sessionStorage.getItem('post_login_redirect') || '/student'
+                sessionStorage.removeItem('post_login_redirect')
+                window.history.replaceState(null, '', window.location.pathname)
+                navigate(redirect, { replace: true })
+              }
+            } catch (e) {
+              console.error('OAuth error:', e.message)
+              toast.error('Sign-in failed. Please try again.')
               window.history.replaceState(null, '', window.location.pathname)
-              navigate(redirect, { replace: true })
             }
-          } catch (e) {
-            toast.error('Sign-in failed. Please try again.')
-            window.history.replaceState(null, '', window.location.pathname)
           }
         }
+        const u = await fetchMe()
+        if (u?.role === 'admin') {
+          await refreshOnboarding(u)
+        }
+      } catch (err) {
+        console.error('Bootstrap error:', err)
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-      const u = await fetchMe()
-      if (u?.role === 'admin') {
-        await refreshOnboarding(u)
-      }
-      if (!cancelled) setLoading(false)
     }
     bootstrap()
     return () => { cancelled = true }
@@ -81,6 +89,14 @@ export function AuthProvider({ children }) {
 
   const loginAdmin = async (email, password) => {
     const { data } = await api.post('/auth/admin/login', { email, password })
+    localStorage.setItem('admin_token', data.access_token)
+    setUser(data.user)
+    await refreshOnboarding(data.user)
+    return data.user
+  }
+
+  const registerAdmin = async (email, password, name) => {
+    const { data } = await api.post('/auth/admin/register', { email, password, name })
     localStorage.setItem('admin_token', data.access_token)
     setUser(data.user)
     await refreshOnboarding(data.user)
@@ -113,6 +129,7 @@ export function AuthProvider({ children }) {
         refreshOnboarding,
         loginStudentWithGoogle,
         loginAdmin,
+        registerAdmin,
         updateProfile,
         logout,
         isAdmin: user?.role === 'admin',
