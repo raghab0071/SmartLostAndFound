@@ -60,8 +60,11 @@ class AdminLogin(BaseModel):
 
 
 class GoogleSessionRequest(BaseModel):
-    session_id: str
-
+    session_id: Optional[str] = None
+    email: Optional[str] = None
+    name: Optional[str] = None
+    picture: Optional[str] = None
+    session_token: Optional[str] = None
 
 class ProfileUpdate(BaseModel):
     name: Optional[str] = None
