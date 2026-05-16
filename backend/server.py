@@ -181,13 +181,20 @@ async def admin_login(payload: AdminLogin):
 
 
 @api.post("/auth/google/session")
-async def google_session(payload: GoogleSessionRequest, response: Response):
+async def google_session(request: Request, payload: GoogleSessionRequest, response: Response):
     """Exchange Emergent Google session_id for our session_token cookie (students only)."""
+    session_id = payload.session_id or request.query_params.get("session_id")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Missing session_id")
     try:
-        async with httpx.AsyncClient(timeout=15) as http:
+        async with httpx.AsyncClient(timeout=15, trust_env=False) as http:
             r = await http.get(
                 "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-                headers={"X-Session-ID": payload.session_id},
+                headers={
+                    "X-Session-ID": session_id,
+                    "Accept": "application/json",
+                    "User-Agent": "SmartLostAndFound/1.0",
+                },
             )
         if r.status_code != 200:
             try:
@@ -195,7 +202,8 @@ async def google_session(payload: GoogleSessionRequest, response: Response):
             except Exception:
                 detail = r.text
             logger.warning("Google session validation failed: status=%s payload=%s detail=%s", r.status_code, payload.session_id, detail)
-            raise HTTPException(status_code=401, detail="Invalid session")
+            detail_msg = detail.get('detail') if isinstance(detail, dict) else detail
+            raise HTTPException(status_code=401, detail=f"Invalid session: {detail_msg}")
         data = r.json()
     except HTTPException:
         raise

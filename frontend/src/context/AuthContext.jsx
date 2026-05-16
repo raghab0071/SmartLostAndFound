@@ -8,6 +8,7 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState(null)
   const [onboardingState, setOnboardingState] = useState(null)
   const [notificationsCount, setNotificationsCount] = useState(0)
   const navigate = useNavigate()
@@ -19,8 +20,20 @@ export function AuthProvider({ children }) {
       return data.user
     } catch (err) {
       const status = err?.response?.status
+      if (status === 404) {
+        try {
+          const { data } = await api.get('/auth/me')
+          setUser(data.user)
+          return data.user
+        } catch (err2) {
+          const status2 = err2?.response?.status
+          if (status2 !== 401 && status2 !== 403) {
+            console.error('fetchMe /auth/me error:', err2.message, err2?.response?.data)
+          }
+        }
+      }
       if (status !== 401 && status !== 403) {
-        console.error('fetchMe error:', err.message)
+        console.error('fetchMe error:', err.message, err?.response?.data)
       }
       setUser(null)
       return null
@@ -71,6 +84,7 @@ export function AuthProvider({ children }) {
     let cancelled = false
     async function bootstrap() {
       try {
+        setAuthError(null)
         const sessionId = getSessionIdFromUrl()
         if (sessionId) {
           console.debug('OAuth callback session_id:', sessionId)
@@ -78,6 +92,7 @@ export function AuthProvider({ children }) {
             const { data } = await api.post('/auth/google/session', { session_id: sessionId })
             if (!cancelled) {
               setUser(data.user)
+              setAuthError(null)
               toast.success(`Welcome, ${data.user.name}!`)
               const redirect = sessionStorage.getItem('post_login_redirect') || '/student'
               sessionStorage.removeItem('post_login_redirect')
@@ -86,8 +101,15 @@ export function AuthProvider({ children }) {
             }
             return
           } catch (e) {
-            console.error('OAuth error:', e?.response?.data || e.message || e)
-            toast.error('Sign-in failed. Please try again.')
+            const detail = e?.response?.data?.detail || e?.response?.data || e?.message || 'Sign-in failed'
+            console.error('OAuth error:', {
+              message: e?.message,
+              status: e?.response?.status,
+              data: e?.response?.data,
+              sessionId,
+            })
+            setAuthError(detail)
+            toast.error(`Sign-in failed: ${detail}`)
             window.history.replaceState(null, '', window.location.pathname)
             return
           }
@@ -110,9 +132,11 @@ export function AuthProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const FRONTEND_BASE_URL = import.meta.env.VITE_REACT_APP_FRONTEND_URL || window.location.origin
+
   const loginStudentWithGoogle = (redirectPath = '/student') => {
     sessionStorage.setItem('post_login_redirect', redirectPath)
-    const redirectUrl = `${window.location.origin}/profile`
+    const redirectUrl = `${FRONTEND_BASE_URL}/profile`
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`
   }
 
@@ -144,12 +168,15 @@ export function AuthProvider({ children }) {
     return data.user
   }
 
+  const clearAuthError = () => setAuthError(null)
+
   const logout = async () => {
     try { await api.post('/auth/logout') } catch {}
     localStorage.removeItem('admin_token')
     setUser(null)
     setOnboardingState(null)
     setNotificationsCount(0)
+    setAuthError(null)
     toast.success('Signed out')
     navigate('/')
   }
@@ -159,6 +186,8 @@ export function AuthProvider({ children }) {
       value={{
         user,
         loading,
+        authError,
+        clearAuthError,
         onboardingState,
         notificationsCount,
         refreshNotifications,
