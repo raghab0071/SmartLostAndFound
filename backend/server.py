@@ -187,10 +187,15 @@ async def google_session(request: Request, payload: GoogleSessionRequest, respon
     if not session_id:
         raise HTTPException(status_code=400, detail="Missing session_id")
     try:
-        async with httpx.AsyncClient(timeout=15, trust_env=False) as http:
+        async with httpx.AsyncClient(timeout=15) as http:
             r = await http.get(
                 "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-                headers={"X-Session-ID": session_id},
+                headers={
+                    "X-Session-ID": session_id,
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Accept": "application/json",
+                    "Accept-Language": "en-US,en;q=0.9"
+                },
             )
         if r.status_code != 200:
             try:
