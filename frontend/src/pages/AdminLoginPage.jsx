@@ -8,8 +8,8 @@ export default function AdminLoginPage() {
   const { user, loginAdmin, registerAdmin } = useAuth()
   const navigate = useNavigate()
   const [mode, setMode] = useState('login')
-  const [email, setEmail] = useState('admin@campus.edu')
-  const [password, setPassword] = useState('Admin@123')
+  const [email, setEmail] = useState({/*'admin@campus.edu'*/})
+  const [password, setPassword] = useState({/*'Admin@123'*/})
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -121,7 +121,7 @@ export default function AdminLoginPage() {
           {mode === 'login' && (
             <div className="mt-5 text-xs text-brand-900/50 bg-brand-50/60 rounded-xl p-3 border border-brand-900/5">
               <div className="font-semibold text-brand-900/70 mb-0.5">Demo credentials</div>
-              admin@campus.edu / Admin@123
+              {/*admin@campus.edu / Admin@123 */}
             </div>
           )}
         </div>

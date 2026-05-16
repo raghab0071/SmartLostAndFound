@@ -10,8 +10,14 @@ export default function AdminLostReports() {
   const [matches, setMatches] = useState({})
 
   useEffect(() => {
+    // Fetch lost items that are visible to this admin
+    // For admins: shows public reports + institute-only reports matching their institute
     api.get('/items/lost', { params: { limit: 200 } })
       .then(({ data }) => setReports(data || []))
+      .catch((err) => {
+        console.error('Failed to fetch lost reports:', err)
+        setReports([])
+      })
       .finally(() => setLoading(false))
   }, [])
 

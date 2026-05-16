@@ -4,15 +4,20 @@ import api from '../../lib/api'
 import toast from 'react-hot-toast'
 import { Sparkles, BellOff, CheckCheck, Bell } from 'lucide-react'
 import { SectionTitle, Spinner, EmptyState } from '../../components/Common.jsx'
+import { useAuth } from '../../context/AuthContext'
 
 export default function StudentNotifications() {
+  const { refreshNotifications } = useAuth()
   const [data, setData] = useState({ items: [], unread: 0 })
   const [loading, setLoading] = useState(true)
 
   const load = () => {
     setLoading(true)
     api.get('/notifications', { params: { limit: 50 } })
-      .then(({ data }) => setData(data))
+      .then(({ data }) => {
+        setData(data)
+        refreshNotifications()
+      })
       .finally(() => setLoading(false))
   }
   useEffect(load, [])

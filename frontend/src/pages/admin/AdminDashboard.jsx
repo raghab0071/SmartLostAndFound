@@ -12,22 +12,63 @@ import {
 export default function AdminDashboard() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    api.get('/dashboard/analytics').then(({ data }) => setData(data)).finally(() => setLoading(false))
+    api.get('/dashboard/analytics')
+      .then(({ data }) => setData(data))
+      .catch((err) => {
+        console.error('Failed to load dashboard:', err)
+        setError(err.message || 'Failed to load dashboard')
+      })
+      .finally(() => setLoading(false))
   }, [])
 
   if (loading) return <Spinner />
+  if (error) return (
+    <div className="card p-8 text-center">
+      <div className="text-red-600 font-semibold mb-2">Unable to load dashboard</div>
+      <div className="text-sm text-brand-900/60">{error}</div>
+    </div>
+  )
   if (!data) return null
   const t = data.totals
   const barColors = ['#172f6f', '#2972f5', '#85b8ff', '#ffb627', '#1aaa6e', '#e84a4a', '#a855f7', '#06b6d4']
+
+  // Show empty state if admin has no centres and no found items
+  const hasNoCentres = t.centres === 0 && t.found === 0 && t.pending_claims === 0
+  
+  if (hasNoCentres) {
+    return (
+      <div data-testid="admin-dashboard" className="space-y-8">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <div className="text-xs uppercase tracking-[0.22em] text-brand-600 font-bold mb-2">Your centre</div>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-brand-900">Your dashboard</h1>
+          </div>
+          <Link to="/admin/found/new" className="btn-primary" data-testid="quick-add-found-btn">
+            <Plus className="w-4 h-4" /> Log found item
+          </Link>
+        </div>
+        
+        <div className="card p-8 text-center border-2 border-dashed border-brand-200">
+          <MapPin className="w-12 h-12 text-brand-300 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-brand-900 mb-2">No centres assigned yet</h2>
+          <p className="text-brand-900/60 mb-4">Add a centre to get started with managing lost & found items.</p>
+          <Link to="/admin/centres" className="btn-primary inline-block">
+            <Plus className="w-4 h-4" /> Create your first centre
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div data-testid="admin-dashboard" className="space-y-8">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <div className="text-xs uppercase tracking-[0.22em] text-brand-600 font-bold mb-2">Operations</div>
-          <h1 className="text-3xl md:text-4xl font-extrabold text-brand-900">Admin overview</h1>
+          <div className="text-xs uppercase tracking-[0.22em] text-brand-600 font-bold mb-2">Your centre</div>
+          <h1 className="text-3xl md:text-4xl font-extrabold text-brand-900">Your dashboard</h1>
         </div>
         <Link to="/admin/found/new" className="btn-primary" data-testid="quick-add-found-btn">
           <Plus className="w-4 h-4" /> Log found item

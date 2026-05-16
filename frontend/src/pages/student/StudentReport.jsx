@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../context/AuthContext'
 import api from '../../lib/api'
 import toast from 'react-hot-toast'
 import { Upload, MapPin, Calendar, Tag, X, Sparkles } from 'lucide-react'
@@ -9,6 +10,7 @@ const CATEGORIES = ['Wallet', 'Phone', 'Keys', 'Bag', 'Electronics', 'Watch', 'U
 
 export default function StudentReport() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -19,6 +21,7 @@ export default function StudentReport() {
     building: '',
     date_lost: new Date().toISOString().slice(0, 10),
     contact: '',
+    visibility: 'public',
     images: [],
   })
   const [submitting, setSubmitting] = useState(false)
@@ -114,6 +117,34 @@ export default function StudentReport() {
             <input data-testid="lr-contact" value={form.contact} onChange={(e) => update('contact', e.target.value)} className="input" placeholder="Phone or email" />
           </Field>
         </div>
+
+        <Field label="Report visibility">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="input-radio">
+              <input type="radio" name="visibility" value="public" checked={form.visibility === 'public'} onChange={(e) => update('visibility', e.target.value)} />
+              <span>Public</span>
+            </label>
+            <label className="input-radio opacity-90">
+              <input
+                type="radio"
+                name="visibility"
+                value="institute_only"
+                checked={form.visibility === 'institute_only'}
+                onChange={(e) => update('visibility', e.target.value)}
+                disabled={!user?.institute}
+              />
+              <span>Institute-only</span>
+            </label>
+          </div>
+          <p className="text-xs text-brand-900/60 mt-1">
+            Public reports are visible to everyone.
+            <br />
+            Institute-only reports are visible only to admins from your institute.
+          </p>
+          {!user?.institute && (
+            <p className="text-xs text-rose-700 mt-1">Set your institute in your profile before choosing institute-only visibility.</p>
+          )}
+        </Field>
 
         <Field label="Photos (optional, helps AI match)">
           <label className="card border-dashed border-2 border-brand-900/15 p-6 grid place-items-center text-center cursor-pointer hover:border-brand-600 transition">

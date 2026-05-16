@@ -11,8 +11,9 @@ from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depend
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import io
+
+from db_proxy import db  # noqa: E402
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -35,12 +36,7 @@ from json_mirror import dump_collection, dump_many, dump_all  # noqa: E402
 
 
 # ---------- App + DB ----------
-MONGO_URL = os.environ["MONGO_URL"]
-DB_NAME = os.environ.get("DB_NAME", "lost_found_db")
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "")
-
-client = AsyncIOMotorClient(MONGO_URL)
-db = client[DB_NAME]
 
 app = FastAPI(title="Smart Lost & Found Ecosystem API")
 api = APIRouter(prefix="/api")
@@ -125,6 +121,25 @@ async def _award_finder_by_roll_no(found_item: dict, claim: dict):
         f"'{found_item.get('title')}' you submitted has been collected by its owner. +50 pts and the Trusted Finder badge!",
         link=f"/items/{found_item.get('item_id')}"
     )
+
+
+async def _admin_manages_found_item(item_id: str, admin: dict) -> bool:
+    item = await db.found_items.find_one({"item_id": item_id}, {"_id": 0, "posted_by_admin_id": 1, "centre_id": 1})
+    if not item:
+        return False
+    if item.get("posted_by_admin_id") == admin["user_id"]:
+        return True
+    centres = await db.centres.find({"managed_by_admin_id": admin["user_id"]}, {"_id": 0, "centre_id": 1}).to_list(length=200)
+    centre_ids = [c["centre_id"] for c in centres if c.get("centre_id")]
+    return bool(item.get("centre_id") in centre_ids)
+
+
+async def _assert_admin_controls_claim(claim: dict, admin: dict):
+    found_item_id = claim.get("found_item_id")
+    if not found_item_id:
+        raise HTTPException(status_code=404, detail="Claim not found")
+    if not await _admin_manages_found_item(found_item_id, admin):
+        raise HTTPException(status_code=403, detail="You can only manage claims for items you oversee")
 
 
 # ---------- AUTH ROUTES ----------
@@ -260,6 +275,9 @@ async def update_profile(payload: ProfileUpdate, user: dict = Depends(get_curren
     fields = ["name", "picture", "institute", "phone"]
     if user.get("role") == "student":
         fields += ["roll_no"]
+    if user.get("role") == "student" and user.get("roll_no") and getattr(payload, "roll_no", None) not in (None, user.get("roll_no")):
+        raise HTTPException(status_code=400, detail="Roll number cannot be changed once set")
+
     for f in fields:
         v = getattr(payload, f, None)
         if v is not None:
@@ -313,7 +331,9 @@ async def list_found_items(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     status: Optional[str] = None,
+    mine: bool = False,
     limit: int = 100,
+    user: Optional[dict] = Depends(get_current_user_optional),
 ):
     query: dict = {}
     if status:
@@ -337,6 +357,17 @@ async def list_found_items(
             {"color": {"$regex": q, "$options": "i"}},
             {"location_found": {"$regex": q, "$options": "i"}},
         ]
+    if mine and user and user.get("role") == "admin":
+        centre_ids = [c["centre_id"] for c in await db.centres.find({"managed_by_admin_id": user["user_id"]}, {"_id": 0, "centre_id": 1}).to_list(length=200)]
+        if centre_ids:
+            item_filter = {"$or": [{"posted_by_admin_id": user["user_id"]}, {"centre_id": {"$in": centre_ids}}]}
+        else:
+            item_filter = {"posted_by_admin_id": user["user_id"]}
+        if query:
+            # We avoid $and if possible. Since we already block $and in proxy, let's just fall back to Mongo
+            query = {"$and": [item_filter, query]}
+        else:
+            query = item_filter
     cursor = db.found_items.find(query, {"_id": 0}).sort("created_at", -1).limit(limit)
     items = await cursor.to_list(length=limit)
     return items
@@ -402,6 +433,8 @@ async def create_found_item(payload: FoundItemCreate, admin: dict = Depends(requ
 
 @api.put("/items/found/{item_id}", response_model=FoundItem)
 async def update_found_item(item_id: str, payload: FoundItemCreate, admin: dict = Depends(require_admin)):
+    if not await _admin_manages_found_item(item_id, admin):
+        raise HTTPException(status_code=403, detail="You can only edit items you manage")
     update_doc = payload.model_dump()
     update_doc["updated_at"] = utc_now()
     res = await db.found_items.update_one({"item_id": item_id}, {"$set": update_doc})
@@ -414,6 +447,8 @@ async def update_found_item(item_id: str, payload: FoundItemCreate, admin: dict 
 
 @api.delete("/items/found/{item_id}")
 async def delete_found_item(item_id: str, admin: dict = Depends(require_admin)):
+    if not await _admin_manages_found_item(item_id, admin):
+        raise HTTPException(status_code=403, detail="You can only delete items you manage")
     res = await db.found_items.delete_one({"item_id": item_id})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Not found")
@@ -452,6 +487,9 @@ async def _auto_match_for_new_found(found_doc: dict):
 # ---------- LOST ITEMS ----------
 @api.post("/items/lost", response_model=LostItem)
 async def create_lost_item(payload: LostItemCreate, user: dict = Depends(get_current_user)):
+    if payload.visibility == "institute_only" and not user.get("institute"):
+        raise HTTPException(status_code=400, detail="Set your institute before sharing institute-only reports")
+
     item_id = new_id("lst_")
     doc = payload.model_dump()
     doc.update({
@@ -465,8 +503,14 @@ async def create_lost_item(payload: LostItemCreate, user: dict = Depends(get_cur
     })
     await db.lost_items.insert_one(doc)
     await dump_collection(db, "lost_items")
-    # Broadcast to admins
-    admins = await db.users.find({"role": "admin"}, {"_id": 0, "user_id": 1}).to_list(length=50)
+
+    # Broadcast to admins based on visibility
+    if payload.visibility == "public":
+        admin_query = {"role": "admin"}
+    else:
+        admin_query = {"role": "admin", "institute": user.get("institute")}
+
+    admins = await db.users.find(admin_query, {"_id": 0, "user_id": 1}).to_list(length=50)
     for a in admins:
         await _notify(
             user_id=a["user_id"],
@@ -475,6 +519,7 @@ async def create_lost_item(payload: LostItemCreate, user: dict = Depends(get_cur
             body=f"{user.get('name','A student')} reported a lost {payload.category}: {payload.title}.",
             link=f"/admin/lost/{item_id}",
         )
+
     # Auto-match against existing found items
     asyncio.create_task(_auto_match_for_new_lost(doc, user))
     return {k: v for k, v in doc.items() if k != "_id"}
@@ -517,9 +562,20 @@ async def list_lost_items(
 ):
     query: dict = {}
     if user.get("role") == "student" or mine:
+        # Students see only their own lost items
         query["reported_by_user_id"] = user["user_id"]
+    elif user.get("role") == "admin":
+        # Admins see only reports for their institute
+        institute = user.get("institute")
+        if institute:
+            query["reported_by_institute"] = institute
+        else:
+            return []
     if status:
-        query["status"] = status
+        if "$or" in query:
+            query = {"$and": [query, {"status": status}]}
+        else:
+            query["status"] = status
     cursor = db.lost_items.find(query, {"_id": 0}).sort("created_at", -1).limit(limit)
     return await cursor.to_list(length=limit)
 
@@ -527,7 +583,10 @@ async def list_lost_items(
 @api.get("/items/lost/alerts/recent", response_model=List[LostItem])
 async def recent_lost_alerts(limit: int = 10):
     """Public endpoint for the homepage alert banner — only basic fields."""
-    cursor = db.lost_items.find({"status": {"$in": ["open", "matched"]}}, {"_id": 0, "contact": 0, "reported_by_email": 0}).sort("created_at", -1).limit(limit)
+    cursor = db.lost_items.find(
+        {"status": {"$in": ["open", "matched"]}, "visibility": "public"},
+        {"_id": 0, "contact": 0, "reported_by_email": 0}
+    ).sort("created_at", -1).limit(limit)
     return await cursor.to_list(length=limit)
 
 
@@ -536,7 +595,11 @@ async def get_lost_item(item_id: str, user: dict = Depends(get_current_user)):
     item = await db.lost_items.find_one({"item_id": item_id}, {"_id": 0})
     if not item:
         raise HTTPException(status_code=404, detail="Not found")
-    if user.get("role") != "admin" and item["reported_by_user_id"] != user["user_id"]:
+    if user.get("role") == "admin":
+        if item.get("visibility") == "institute_only" and item.get("reported_by_institute") != user.get("institute"):
+            raise HTTPException(status_code=403, detail="Forbidden")
+        return item
+    if item["reported_by_user_id"] != user["user_id"]:
         raise HTTPException(status_code=403, detail="Forbidden")
     return item
 
@@ -547,7 +610,10 @@ async def get_matches_for_lost(lost_item_id: str, user: dict = Depends(get_curre
     lost = await db.lost_items.find_one({"item_id": lost_item_id}, {"_id": 0})
     if not lost:
         raise HTTPException(status_code=404, detail="Lost item not found")
-    if user.get("role") != "admin" and lost["reported_by_user_id"] != user["user_id"]:
+    if user.get("role") == "admin":
+        if lost.get("visibility") == "institute_only" and lost.get("reported_by_institute") != user.get("institute"):
+            raise HTTPException(status_code=403, detail="Forbidden")
+    elif lost["reported_by_user_id"] != user["user_id"]:
         raise HTTPException(status_code=403, detail="Forbidden")
     cached = await db.matches.find({"lost_item_id": lost_item_id}, {"_id": 0}).sort("similarity", -1).to_list(length=50)
     if cached:
@@ -567,7 +633,10 @@ async def refresh_matches(lost_item_id: str, user: dict = Depends(get_current_us
     lost = await db.lost_items.find_one({"item_id": lost_item_id}, {"_id": 0})
     if not lost:
         raise HTTPException(status_code=404, detail="Lost item not found")
-    if user.get("role") != "admin" and lost["reported_by_user_id"] != user["user_id"]:
+    if user.get("role") == "admin":
+        if lost.get("visibility") == "institute_only" and lost.get("reported_by_institute") != user.get("institute"):
+            raise HTTPException(status_code=403, detail="Forbidden")
+    elif lost["reported_by_user_id"] != user["user_id"]:
         raise HTTPException(status_code=403, detail="Forbidden")
     cursor = db.found_items.find({"status": {"$in": ["open"]}}, {"_id": 0})
     found_items = await cursor.to_list(length=200)
@@ -632,7 +701,17 @@ async def create_claim(payload: ClaimCreate, user: dict = Depends(get_current_us
 @api.get("/claims", response_model=List[Claim])
 async def list_claims(user: dict = Depends(get_current_user), status: Optional[str] = None):
     query: dict = {}
-    if user.get("role") != "admin":
+    if user.get("role") == "admin":
+        centre_ids = [c["centre_id"] for c in await db.centres.find({"managed_by_admin_id": user["user_id"]}, {"_id": 0, "centre_id": 1}).to_list(length=200)]
+        item_filter = {"posted_by_admin_id": user["user_id"]}
+        if centre_ids:
+            item_filter = {"$or": [item_filter, {"centre_id": {"$in": centre_ids}}]}
+        item_ids = [item["item_id"] for item in await db.found_items.find(item_filter, {"_id": 0, "item_id": 1}).to_list(length=500)]
+        if item_ids:
+            query["found_item_id"] = {"$in": item_ids}
+        else:
+            return []
+    else:
         query["claimant_user_id"] = user["user_id"]
     if status:
         query["status"] = status
@@ -645,7 +724,9 @@ async def get_claim(claim_id: str, user: dict = Depends(get_current_user)):
     claim = await db.claims.find_one({"claim_id": claim_id}, {"_id": 0})
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
-    if user.get("role") != "admin" and claim["claimant_user_id"] != user["user_id"]:
+    if user.get("role") == "admin":
+        await _assert_admin_controls_claim(claim, user)
+    elif claim["claimant_user_id"] != user["user_id"]:
         raise HTTPException(status_code=403, detail="Forbidden")
     return claim
 
@@ -657,6 +738,7 @@ async def _transition_claim(claim_id: str, admin: dict, new_status: str,
     claim = await db.claims.find_one({"claim_id": claim_id}, {"_id": 0})
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
+    await _assert_admin_controls_claim(claim, admin)
     timeline = claim.get("timeline") or []
     timeline.append(_timeline_entry(new_status, by=admin, notes=notes))
     await db.claims.update_one(
@@ -859,36 +941,79 @@ async def mark_all_read(user: dict = Depends(get_current_user)):
 # ---------- ANALYTICS DASHBOARD ----------
 @api.get("/dashboard/analytics")
 async def admin_dashboard_analytics(admin: dict = Depends(require_admin)):
-    found_total = await db.found_items.count_documents({})
-    lost_total = await db.lost_items.count_documents({})
-    open_found = await db.found_items.count_documents({"status": "open"})
-    pending_claims = await db.claims.count_documents({"status": {"$in": ACTIVE_CLAIM_STATUSES}})
-    returned = await db.found_items.count_documents({"status": "returned"})
-    centres = await db.centres.count_documents({})
-    students = await db.users.count_documents({"role": "student"})
+    # Get centres managed by this admin
+    centres_list = await db.centres.find({"managed_by_admin_id": admin["user_id"]}, {"_id": 0, "centre_id": 1}).sort("created_at", -1).limit(100).to_list(length=100)
+    centre_ids = [c["centre_id"] for c in centres_list if c.get("centre_id")]
 
-    # Recovery rate
+    # If admin has no centres and hasn't posted any found items, return zeroed totals
+    posted_count = await db.found_items.count_documents({"posted_by_admin_id": admin["user_id"]})
+    if not centre_ids and posted_count == 0:
+        return {
+            "totals": {
+                "found": 0,
+                "lost": 0,
+                "open_found": 0,
+                "pending_claims": 0,
+                "returned": 0,
+                "recovery_rate": 0,
+                "centres": 0,
+                "students": 0,
+            },
+            "by_category": [],
+            "weekly_trend": [{"day": d.strftime("%a"), "found": 0, "lost": 0} for d in [__import__('datetime').date.today() - __import__('datetime').timedelta(days=i) for i in range(6, -1, -1)]],
+        }
+
+    # Filter for items this admin can see: either posted by them or in their centres
+    found_filter = {"posted_by_admin_id": admin["user_id"]}
+    if centre_ids:
+        found_filter = {"$or": [
+            {"posted_by_admin_id": admin["user_id"]},
+            {"centre_id": {"$in": centre_ids}}
+        ]}
+
+    # Count found items
+    found_total = await db.found_items.count_documents(found_filter)
+    open_found = await db.found_items.count_documents({**found_filter, "status": "open"})
+    returned = await db.found_items.count_documents({**found_filter, "status": "returned"})
+
+    # Count pending claims for items this admin manages
+    item_ids = [item["item_id"] for item in await db.found_items.find(found_filter, {"_id": 0, "item_id": 1}).to_list(length=500)]
+    pending_claims = 0
+    if item_ids:
+        pending_claims = await db.claims.count_documents({"status": {"$in": ACTIVE_CLAIM_STATUSES}, "found_item_id": {"$in": item_ids}})
+
+    centres = len(centre_ids)
+
+    # Count students in the admin's institute only; if admin hasn't set institute, show 0
+    students = 0
+    if admin.get("institute"):
+        student_query = {"role": "student", "institute": admin.get("institute")}
+        students = await db.users.count_documents(student_query)
+
+    # Count lost items reported by students in the admin's institute
+    lost_total = await db.lost_items.count_documents({"reported_by_institute": admin.get("institute")}) if admin.get("institute") else 0
+
     recovery_rate = round((returned / found_total) * 100, 1) if found_total else 0
 
-    # By category breakdown
-    cat_pipeline = [
-        {"$group": {"_id": "$category", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
-        {"$limit": 8},
-    ]
-    by_category = await db.found_items.aggregate(cat_pipeline).to_list(length=20)
-    by_category = [{"category": c["_id"] or "Other", "count": c["count"]} for c in by_category]
+    # Get category breakdown (simplified without aggregation for Supabase compatibility)
+    all_found_items = await db.found_items.find(found_filter, {"_id": 0, "category": 1}).to_list(length=1000)
+    category_counts = {}
+    for item in all_found_items:
+        cat = item.get("category") or "Other"
+        category_counts[cat] = category_counts.get(cat, 0) + 1
 
-    # Last 7 day trend
+    by_category = [{"category": cat, "count": count} for cat, count in sorted(category_counts.items(), key=lambda x: x[1], reverse=True)][:8]
+
+    # Weekly trend (simplified date handling)
     from datetime import datetime, timedelta
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now().date()
     days = [today - timedelta(days=i) for i in range(6, -1, -1)]
     trend = []
     for d in days:
-        start = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
-        end = start + timedelta(days=1)
-        f_count = await db.found_items.count_documents({"created_at": {"$gte": start, "$lt": end}})
-        l_count = await db.lost_items.count_documents({"created_at": {"$gte": start, "$lt": end}})
+        # Count items created on this date (simplified - using string comparison)
+        date_str = d.isoformat()
+        f_count = await db.found_items.count_documents({**found_filter, "created_at": {"$regex": f"^{date_str}"}})
+        l_count = await db.lost_items.count_documents({"reported_by_institute": admin.get("institute"), "created_at": {"$regex": f"^{date_str}"}}) if admin.get("institute") else 0
         trend.append({"day": d.strftime("%a"), "found": f_count, "lost": l_count})
 
     return {
@@ -933,15 +1058,8 @@ async def health():
 # ---------- SEED HOOK ----------
 @app.on_event("startup")
 async def on_startup():
-    # Ensure indexes
-    await db.users.create_index("email", unique=True)
-    await db.users.create_index("user_id", unique=True)
-    await db.user_sessions.create_index("session_token", unique=True)
-    await db.found_items.create_index("item_id", unique=True)
-    await db.lost_items.create_index("item_id", unique=True)
-    await db.claims.create_index("claim_id", unique=True)
-    await db.centres.create_index("centre_id", unique=True)
-    await db.notifications.create_index([("user_id", 1), ("created_at", -1)])
+    # Indexes are already created in Supabase schema.
+    # No need to create them programmatically for the proxy backend.
 
     # Seed demo data only if empty
     try:
@@ -977,4 +1095,4 @@ app.include_router(api)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    await db.close()

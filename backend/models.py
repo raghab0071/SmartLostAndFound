@@ -134,9 +134,28 @@ class LostItemCreate(BaseModel):
     date_lost: Optional[str] = None
     contact: Optional[str] = None
     images: List[str] = Field(default_factory=list)
+    visibility: Literal["public", "institute_only"] = "public"
 
 
 class LostItem(BaseModel):
+    item_id: str
+    title: str
+    description: str
+    category: str
+    color: Optional[str] = None
+    brand: Optional[str] = None
+    last_seen_location: str
+    building: Optional[str] = None
+    date_lost: Optional[str] = None
+    contact: Optional[str] = None
+    images: List[str] = Field(default_factory=list)
+    visibility: Literal["public", "institute_only"] = "public"
+    status: LostStatus = "open"
+    reported_by_user_id: str
+    reported_by_name: Optional[str] = None
+    reported_by_email: Optional[str] = None
+    reported_by_institute: Optional[str] = None
+    created_at: datetime = Field(default_factory=utc_now)
     item_id: str
     title: str
     description: str

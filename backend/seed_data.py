@@ -55,7 +55,7 @@ async def seed_if_empty(db):
         return  # don't seed content unless explicitly enabled
 
     # Only seed content if there are no found items yet
-    if await db.found_items.find_one({}):
+    if await db.found_items.find_one({}) is not None:
         return
 
     now = utc_now()
@@ -71,32 +71,35 @@ async def seed_if_empty(db):
     await db.users.insert_many([
         {"user_id": student_alice, "email": "alice.student@campus.edu", "name": "Alice Johnson",
          "picture": "https://i.pravatar.cc/150?img=47", "role": "student", "points": 120,
-         "badges": ["Trusted Finder", "Campus Hero"], "created_at": now},
+         "badges": ["Trusted Finder", "Campus Hero"], "institute": "Demo Institute", "roll_no": "A001", "created_at": now},
         {"user_id": student_bob, "email": "bob.student@campus.edu", "name": "Bob Martinez",
          "picture": "https://i.pravatar.cc/150?img=12", "role": "student", "points": 80,
-         "badges": ["Reunited"], "created_at": now},
+         "badges": ["Reunited"], "institute": "Demo Institute", "roll_no": "B002", "created_at": now},
         {"user_id": student_priya, "email": "priya.student@campus.edu", "name": "Priya Iyer",
          "picture": "https://i.pravatar.cc/150?img=32", "role": "student", "points": 50,
-         "badges": [], "created_at": now},
+         "badges": [], "institute": "Demo Institute", "roll_no": "P003", "created_at": now},
     ])
 
-    # Centres
+    # Centres - all managed by the demo admin
     centres = [
         {"centre_id": new_id("ctr_"), "name": "Main Library Lost & Found",
          "description": "Located on the ground floor near the entrance. Handles items found inside the library.",
          "location": "Block A, Main Library, Ground Floor", "building": "Main Library",
          "contact_phone": "+91 80 1234 5601", "contact_email": "library.lf@campus.edu",
-         "hours": "Mon–Sat · 9:00 AM – 6:00 PM", "image": DEMO_IMAGES["centre1"], "created_at": now},
+         "hours": "Mon–Sat · 9:00 AM – 6:00 PM", "image": DEMO_IMAGES["centre1"],
+         "institute": "Demo Institute", "managed_by_admin_id": admin_id, "created_at": now},
         {"centre_id": new_id("ctr_"), "name": "Student Centre Help Desk",
          "description": "Central student hub. Drop-off and pick-up of all lost & found items.",
          "location": "Student Activity Centre, Room 102", "building": "Student Centre",
          "contact_phone": "+91 80 1234 5602", "contact_email": "studentcentre@campus.edu",
-         "hours": "Mon–Fri · 8:30 AM – 7:00 PM", "image": DEMO_IMAGES["centre2"], "created_at": now},
+         "hours": "Mon–Fri · 8:30 AM – 7:00 PM", "image": DEMO_IMAGES["centre2"],
+         "institute": "Demo Institute", "managed_by_admin_id": admin_id, "created_at": now},
         {"centre_id": new_id("ctr_"), "name": "Sports Complex Reception",
          "description": "Handles items found in gyms, pools, and sports fields.",
          "location": "Sports Complex, Reception", "building": "Sports Complex",
          "contact_phone": "+91 80 1234 5603", "contact_email": "sports.lf@campus.edu",
-         "hours": "Daily · 6:00 AM – 9:00 PM", "image": DEMO_IMAGES["centre3"], "created_at": now},
+         "hours": "Daily · 6:00 AM – 9:00 PM", "image": DEMO_IMAGES["centre3"],
+         "institute": "Demo Institute", "managed_by_admin_id": admin_id, "created_at": now},
     ]
     await db.centres.insert_many(centres)
     centre_ids = [c["centre_id"] for c in centres]
@@ -195,9 +198,11 @@ async def seed_if_empty(db):
             "contact": "+91 98xxxxxxxx",
             "images": [],
             "status": "open",
+            "visibility": "institute_only",
             "reported_by_user_id": student_alice,
             "reported_by_name": "Alice Johnson",
             "reported_by_email": "alice.student@campus.edu",
+            "reported_by_institute": "Demo Institute",
             "created_at": now - timedelta(hours=6),
         },
         {
@@ -210,9 +215,11 @@ async def seed_if_empty(db):
             "contact": "+91 97xxxxxxxx",
             "images": [],
             "status": "open",
+            "visibility": "institute_only",
             "reported_by_user_id": student_bob,
             "reported_by_name": "Bob Martinez",
             "reported_by_email": "bob.student@campus.edu",
+            "reported_by_institute": "Demo Institute",
             "created_at": now - timedelta(hours=10),
         },
         {
@@ -225,9 +232,11 @@ async def seed_if_empty(db):
             "contact": "+91 99xxxxxxxx",
             "images": [],
             "status": "open",
+            "visibility": "institute_only",
             "reported_by_user_id": student_priya,
             "reported_by_name": "Priya Iyer",
             "reported_by_email": "priya.student@campus.edu",
+            "reported_by_institute": "Demo Institute",
             "created_at": now - timedelta(hours=24),
         },
     ]

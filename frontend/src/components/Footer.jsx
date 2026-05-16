@@ -37,9 +37,9 @@ export default function Footer() {
         <div>
           <div className="text-xs uppercase tracking-widest text-white/40 mb-3">Connect</div>
           <div className="flex items-center gap-3 text-white/70">
-            <a href="#" className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 grid place-items-center"><Twitter className="w-4 h-4" /></a>
-            <a href="#" className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 grid place-items-center"><Github className="w-4 h-4" /></a>
-            <a href="#" className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 grid place-items-center"><Mail className="w-4 h-4" /></a>
+            <a href="https://twitter.com" className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 grid place-items-center"><Twitter className="w-4 h-4" /></a>
+            <a href="https://github.com/raghab0071/SmartLostAndFound" className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 grid place-items-center"><Github className="w-4 h-4" /></a>
+            <a href="mailto:info@findit.com" className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 grid place-items-center"><Mail className="w-4 h-4" /></a>
           </div>
         </div>
       </div>

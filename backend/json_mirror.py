@@ -30,8 +30,8 @@ def _default(o):
 
 
 def _sanitize(doc: dict) -> dict:
-    if not doc:
-        return doc
+    if doc is None:
+        return None
     out = {}
     for k, v in doc.items():
         if k == "_id":
@@ -47,7 +47,10 @@ async def dump_collection(db, name: str):
     if name not in MIRRORED:
         return
     try:
-        cursor = db[name].find({}, {"_id": 0}).sort("created_at", -1)
+        collection = getattr(db, name, None)
+        if collection is None:
+            raise AttributeError(f"Database collection not found: {name}")
+        cursor = collection.find({}, {"_id": 0}).sort("created_at", -1)
         docs = await cursor.to_list(length=10_000)
         docs = [_sanitize(d) for d in docs]
         path = MIRROR_DIR / f"{name}.json"

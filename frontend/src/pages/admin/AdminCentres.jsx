@@ -16,7 +16,7 @@ export default function AdminCentres() {
 
   const load = () => {
     setLoading(true)
-    api.get('/centres').then(({ data }) => setCentres(data || [])).finally(() => setLoading(false))
+    api.get('/centres', { params: { mine: true } }).then(({ data }) => setCentres(data || [])).finally(() => setLoading(false))
   }
   useEffect(load, [])
 
@@ -69,6 +69,7 @@ export default function AdminCentres() {
               </div>
               <div className="flex-1">
                 <div className="font-bold text-brand-900">{c.name}</div>
+                {c.institute && <div className="text-xs text-brand-600 font-medium mt-0.5">Institute: {c.institute}</div>}
                 <div className="text-xs text-brand-900/60 mt-0.5">{c.location}</div>
                 {c.hours && <div className="text-xs text-brand-900/60 mt-1">⏰ {c.hours}</div>}
               </div>

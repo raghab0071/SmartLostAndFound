@@ -24,7 +24,7 @@ export default function AdminFoundItemForm() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    api.get('/centres').then(({ data }) => setCentres(data || []))
+    api.get('/centres', { params: { mine: true } }).then(({ data }) => setCentres(data || []))
     if (isEdit) {
       api.get(`/items/found/${itemId}`).then(({ data }) => {
         setForm({ ...EMPTY, ...data, centre_id: data.centre_id || '' })

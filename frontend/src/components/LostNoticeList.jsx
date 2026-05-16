@@ -36,7 +36,7 @@ export default function LostNoticeList({ notices = [], emptyLabel = "No active l
             </div>
           </div>
           <div className="text-[10px] uppercase tracking-widest text-amber-700 font-bold shrink-0 opacity-0 group-hover:opacity-100 transition">
-            Found it?
+            Found it? Then submit it to the Institute Lost & Found.
           </div>
         </div>
       ))}

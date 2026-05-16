@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { Bell, LogOut, Search, ShieldCheck, User as UserIcon, Menu, X, ChevronDown } from 'lucide-react'
 
 export default function Navbar() {
-  const { user, isAdmin, isStudent, logout } = useAuth()
+  const { user, isAdmin, isStudent, logout, notificationsCount } = useAuth()
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [userMenu, setUserMenu] = useState(false)
@@ -57,6 +57,9 @@ export default function Navbar() {
               {isStudent && (
                 <button data-testid="nav-bell-btn" onClick={() => { navigate('/student/notifications'); close() }} className="relative w-10 h-10 rounded-full grid place-items-center hover:bg-brand-50 transition" title="Notifications">
                   <Bell className="w-5 h-5 text-brand-900" />
+                  {notificationsCount > 0 && (
+                    <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-white" />
+                  )}
                 </button>
               )}
               <div className="relative">

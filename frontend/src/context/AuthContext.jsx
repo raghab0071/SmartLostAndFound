@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [onboardingState, setOnboardingState] = useState(null)
+  const [notificationsCount, setNotificationsCount] = useState(0)
   const navigate = useNavigate()
 
   const fetchMe = useCallback(async () => {
@@ -36,6 +37,21 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.error('refreshOnboarding error:', err.message)
       return null
+    }
+  }, [user])
+
+  const refreshNotifications = useCallback(async () => {
+    if (!user || user.role !== 'student') {
+      setNotificationsCount(0)
+      return 0
+    }
+    try {
+      const { data } = await api.get('/notifications', { params: { limit: 1 } })
+      setNotificationsCount(data.unread || 0)
+      return data.unread || 0
+    } catch (err) {
+      console.error('refreshNotifications error:', err.message)
+      return 0
     }
   }, [user])
 
@@ -69,6 +85,9 @@ export function AuthProvider({ children }) {
         const u = await fetchMe()
         if (u?.role === 'admin') {
           await refreshOnboarding(u)
+        }
+        if (u?.role === 'student') {
+          await refreshNotifications()
         }
       } catch (err) {
         console.error('Bootstrap error:', err)
@@ -106,7 +125,12 @@ export function AuthProvider({ children }) {
   const updateProfile = async (payload) => {
     const { data } = await api.patch('/auth/profile', payload)
     setUser(data.user)
-    if (data.user.role === 'admin') await refreshOnboarding(data.user)
+    if (data.user.role === 'admin') {
+      await refreshOnboarding(data.user)
+    }
+    if (data.user.role === 'student') {
+      await refreshNotifications()
+    }
     return data.user
   }
 
@@ -115,6 +139,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('admin_token')
     setUser(null)
     setOnboardingState(null)
+    setNotificationsCount(0)
     toast.success('Signed out')
     navigate('/')
   }
@@ -125,6 +150,8 @@ export function AuthProvider({ children }) {
         user,
         loading,
         onboardingState,
+        notificationsCount,
+        refreshNotifications,
         fetchMe,
         refreshOnboarding,
         loginStudentWithGoogle,

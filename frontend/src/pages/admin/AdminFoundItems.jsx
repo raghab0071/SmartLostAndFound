@@ -13,7 +13,7 @@ export default function AdminFoundItems() {
 
   const load = () => {
     setLoading(true)
-    api.get('/items/found', { params: { limit: 200 } })
+    api.get('/items/found', { params: { limit: 200, mine: true } })
       .then(({ data }) => setItems(data || [])).finally(() => setLoading(false))
   }
   useEffect(load, [])
@@ -112,6 +112,20 @@ export default function AdminFoundItems() {
             <p className="text-xs text-brand-900/60 mt-1 mb-4">{qrItem.item_id}</p>
             <div className="bg-white p-3 rounded-xl border border-brand-900/10 grid place-items-center">
               <img src={`${API_BASE}/api/items/found/${qrItem.item_id}/qr`} alt="QR" className="w-60 h-60" data-testid="admin-qr-img" />
+            </div>
+            <div className="mt-4 flex flex-col gap-2">
+              <input
+                readOnly
+                value={`${window.location.origin}/items/${qrItem.item_id}`}
+                className="input text-xs"
+              />
+              <button
+                type="button"
+                onClick={() => navigator.clipboard.writeText(`${window.location.origin}/items/${qrItem.item_id}`)}
+                className="btn-ghost text-sm"
+              >
+                Copy public item link
+              </button>
             </div>
             <p className="text-xs text-brand-900/60 mt-3 text-center">Print and attach to the physical item. Scanning opens the public page.</p>
           </div>

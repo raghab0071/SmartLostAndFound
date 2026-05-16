@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import api from '../lib/api'
 import toast from 'react-hot-toast'
 import { Upload, User, Building2, Phone, Hash, Save, Award } from 'lucide-react'
 import { SectionTitle } from '../components/Common.jsx'
@@ -9,10 +10,36 @@ export default function UserProfilePage() {
   const isStudent = user?.role === 'student'
   const [name, setName] = useState(user?.name || '')
   const [institute, setInstitute] = useState(user?.institute || '')
+  const [customInstitute, setCustomInstitute] = useState('')
   const [rollNo, setRollNo] = useState(user?.roll_no || '')
   const [phone, setPhone] = useState(user?.phone || '')
   const [picture, setPicture] = useState(user?.picture || '')
+  const [institutes, setInstitutes] = useState([])
   const [saving, setSaving] = useState(false)
+
+  const [loadingInstitutes, setLoadingInstitutes] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    const loadInstitutes = async () => {
+      try {
+        const { data } = await api.get('/centres')
+        if (cancelled) return
+        const unique = Array.from(new Set((data || []).map((c) => c.institute).filter(Boolean)))
+        setInstitutes(unique)
+        if (user?.institute && !unique.includes(user.institute)) {
+          setCustomInstitute(user.institute)
+          setInstitute('')
+        }
+      } catch (err) {
+        console.error('loadInstitutes error:', err.message)
+      } finally {
+        if (!cancelled) setLoadingInstitutes(false)
+      }
+    }
+    loadInstitutes()
+    return () => { cancelled = true }
+  }, [])
 
   if (!user) return null
 
@@ -26,9 +53,10 @@ export default function UserProfilePage() {
     e.preventDefault()
     setSaving(true)
     try {
+      const finalInstitute = institute || customInstitute
       await updateProfile({
         name: name.trim(),
-        institute: institute.trim() || undefined,
+        institute: finalInstitute.trim() || undefined,
         roll_no: isStudent ? rollNo.trim() : undefined,
         phone: phone.trim() || undefined,
         picture: picture || undefined,
@@ -80,11 +108,49 @@ export default function UserProfilePage() {
             <input data-testid="me-name-input" required value={name} onChange={(e) => setName(e.target.value)} className="input" />
           </Field>
           <Field icon={Building2} label="Institute / Campus">
-            <input data-testid="me-institute-input" value={institute} onChange={(e) => setInstitute(e.target.value)} className="input" placeholder="e.g., IIT Bombay" />
+            {institutes.length > 0 ? (
+              <>
+                <select
+                  data-testid="me-institute-input"
+                  value={institute || 'other'}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setInstitute(value === 'other' ? '' : value)
+                    if (value !== 'other') setCustomInstitute('')
+                  }}
+                  className="input"
+                >
+                  <option value="">Select your institute</option>
+                  {institutes.map((inst) => (
+                    <option key={inst} value={inst}>{inst}</option>
+                  ))}
+                  <option value="other">Other</option>
+                </select>
+                {((institute === '' && customInstitute) || institute === '') && (
+                  <input
+                    data-testid="me-institute-custom-input"
+                    value={customInstitute}
+                    onChange={(e) => setCustomInstitute(e.target.value)}
+                    className="input mt-3"
+                    placeholder="Enter your institute"
+                  />
+                )}
+              </>
+            ) : (
+              <input data-testid="me-institute-input" value={institute} onChange={(e) => setInstitute(e.target.value)} className="input" placeholder="e.g., IIT Bombay" />
+            )}
           </Field>
           {isStudent && (
             <Field icon={Hash} label="Roll number">
-              <input data-testid="me-rollno-input" value={rollNo} onChange={(e) => setRollNo(e.target.value)} className="input" />
+              <input
+                data-testid="me-rollno-input"
+                value={rollNo}
+                onChange={(e) => setRollNo(e.target.value)}
+                className="input"
+                readOnly={Boolean(user?.roll_no)}
+                placeholder={user?.roll_no ? 'Roll number cannot be changed' : ''}
+              />
+              {user?.roll_no && <div className="text-[10px] text-brand-900/60 mt-1">Roll number is locked once set.</div>}
             </Field>
           )}
           <Field icon={Phone} label="Phone">
