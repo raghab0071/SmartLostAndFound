@@ -14,14 +14,25 @@ export function AuthProvider({ children }) {
 
   const fetchMe = useCallback(async () => {
     try {
-      const { data } = await api.get('/auth/me')
+      const { data } = await api.get('/auth/status')
       setUser(data.user)
       return data.user
     } catch (err) {
-      console.error('fetchMe error:', err.message)
+      const status = err?.response?.status
+      if (status !== 401 && status !== 403) {
+        console.error('fetchMe error:', err.message)
+      }
       setUser(null)
       return null
     }
+  }, [])
+
+  const getSessionIdFromUrl = useCallback(() => {
+    const hash = window.location.hash || ''
+    const search = window.location.search || ''
+    const hashParams = new URLSearchParams(hash.replace(/^#/, ''))
+    const queryParams = new URLSearchParams(search.replace(/^\?/, ''))
+    return hashParams.get('session_id') || queryParams.get('session_id')
   }, [])
 
   const refreshOnboarding = useCallback(async (currentUser) => {
@@ -60,26 +71,25 @@ export function AuthProvider({ children }) {
     let cancelled = false
     async function bootstrap() {
       try {
-        const hash = window.location.hash || ''
-        if (hash.includes('session_id=')) {
-          const params = new URLSearchParams(hash.replace(/^#/, ''))
-          const sessionId = params.get('session_id')
-          if (sessionId) {
-            try {
-              const { data } = await api.post('/auth/google/session', { session_id: sessionId })
-              if (!cancelled) {
-                setUser(data.user)
-                toast.success(`Welcome, ${data.user.name}!`)
-                const redirect = sessionStorage.getItem('post_login_redirect') || '/student'
-                sessionStorage.removeItem('post_login_redirect')
-                window.history.replaceState(null, '', window.location.pathname)
-                navigate(redirect, { replace: true })
-              }
-            } catch (e) {
-              console.error('OAuth error:', e.message)
-              toast.error('Sign-in failed. Please try again.')
+        const sessionId = getSessionIdFromUrl()
+        if (sessionId) {
+          console.debug('OAuth callback session_id:', sessionId)
+          try {
+            const { data } = await api.post('/auth/google/session', { session_id: sessionId })
+            if (!cancelled) {
+              setUser(data.user)
+              toast.success(`Welcome, ${data.user.name}!`)
+              const redirect = sessionStorage.getItem('post_login_redirect') || '/student'
+              sessionStorage.removeItem('post_login_redirect')
               window.history.replaceState(null, '', window.location.pathname)
+              navigate(redirect, { replace: true })
             }
+            return
+          } catch (e) {
+            console.error('OAuth error:', e?.response?.data || e.message || e)
+            toast.error('Sign-in failed. Please try again.')
+            window.history.replaceState(null, '', window.location.pathname)
+            return
           }
         }
         const u = await fetchMe()
@@ -102,7 +112,7 @@ export function AuthProvider({ children }) {
 
   const loginStudentWithGoogle = (redirectPath = '/student') => {
     sessionStorage.setItem('post_login_redirect', redirectPath)
-    const redirectUrl = `${window.location.origin}/`
+    const redirectUrl = `${window.location.origin}/profile`
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`
   }
 

@@ -15,6 +15,11 @@ export default function ItemDetailPage() {
   const [claimOpen, setClaimOpen] = useState(false)
   const [qrOpen, setQrOpen] = useState(false)
 
+  const canEditItem = (item) => {
+    if (!isAdmin || !user || !item) return false
+    return item.posted_by_admin_id === user.user_id
+  }
+
   const load = () => {
     setLoading(true)
     api.get(`/items/found/${itemId}`).then(({ data }) => setItem(data))
@@ -85,7 +90,7 @@ export default function ItemDetailPage() {
                 <Send className="w-4 h-4" /> File a claim
               </button>
             )}
-            {isAdmin && (
+            {canEditItem(item) && (
               <Link to={`/admin/found/${item.item_id}/edit`} className="btn-ghost" data-testid="edit-item-btn">
                 Edit item
               </Link>

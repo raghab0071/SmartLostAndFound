@@ -190,6 +190,11 @@ async def google_session(payload: GoogleSessionRequest, response: Response):
                 headers={"X-Session-ID": payload.session_id},
             )
         if r.status_code != 200:
+            try:
+                detail = r.json()
+            except Exception:
+                detail = r.text
+            logger.warning("Google session validation failed: status=%s payload=%s detail=%s", r.status_code, payload.session_id, detail)
             raise HTTPException(status_code=401, detail="Invalid session")
         data = r.json()
     except HTTPException:
@@ -266,6 +271,11 @@ async def google_session(payload: GoogleSessionRequest, response: Response):
 @api.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
     return {"user": _public_user(user)}
+
+
+@api.get("/auth/status")
+async def auth_status(user: Optional[dict] = Depends(get_current_user_optional)):
+    return {"user": _public_user(user) if user else None}
 
 
 @api.patch("/auth/profile")

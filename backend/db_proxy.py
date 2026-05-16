@@ -338,6 +338,11 @@ class DualDatabase:
     def __getattr__(self, attr: str) -> CollectionProxy:
         return CollectionProxy(attr)
 
+    async def command(self, command: str, *args, **kwargs):
+        if _mongo_db is None:
+            raise RuntimeError("MongoDB is not configured")
+        return await _mongo_db.command(command, *args, **kwargs)
+
     async def close(self):
         if _supabase_client:
             await _supabase_client.aclose()
