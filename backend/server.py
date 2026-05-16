@@ -190,11 +190,7 @@ async def google_session(request: Request, payload: GoogleSessionRequest, respon
         async with httpx.AsyncClient(timeout=15, trust_env=False) as http:
             r = await http.get(
                 "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-                headers={
-                    "X-Session-ID": session_id,
-                    "Accept": "application/json",
-                    "User-Agent": "SmartLostAndFound/1.0",
-                },
+                headers={"X-Session-ID": session_id},
             )
         if r.status_code != 200:
             try:

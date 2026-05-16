@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api from '../lib/api'
@@ -11,6 +11,7 @@ export function AuthProvider({ children }) {
   const [authError, setAuthError] = useState(null)
   const [onboardingState, setOnboardingState] = useState(null)
   const [notificationsCount, setNotificationsCount] = useState(0)
+  const exchangeAttempted = useRef(false)
   const navigate = useNavigate()
 
   const fetchMe = useCallback(async () => {
@@ -87,6 +88,8 @@ export function AuthProvider({ children }) {
         setAuthError(null)
         const sessionId = getSessionIdFromUrl()
         if (sessionId) {
+          if (exchangeAttempted.current) return
+          exchangeAttempted.current = true
           console.debug('OAuth callback session_id:', sessionId)
           try {
             const { data } = await api.post('/auth/google/session', { session_id: sessionId })
