@@ -194,7 +194,9 @@ async def google_session(request: Request, payload: GoogleSessionRequest, respon
                     "X-Session-ID": session_id,
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                     "Accept": "application/json",
-                    "Accept-Language": "en-US,en;q=0.9"
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Referer": "https://auth.emergentagent.com/",
+                    "Origin": "https://auth.emergentagent.com"
                 },
             )
         if r.status_code != 200:
@@ -202,8 +204,8 @@ async def google_session(request: Request, payload: GoogleSessionRequest, respon
                 detail = r.json()
             except Exception:
                 detail = r.text
-            logger.warning("Google session validation failed: status=%s payload=%s detail=%s", r.status_code, payload.session_id, detail)
-            detail_msg = detail.get('detail') if isinstance(detail, dict) else detail
+            logger.warning("Google session validation failed: status=%s session_id=%s detail=%s", r.status_code, session_id, detail)
+            detail_msg = detail.get('detail') if isinstance(detail, dict) else str(detail)[:100]
             raise HTTPException(status_code=401, detail=f"Invalid session: {detail_msg}")
         data = r.json()
     except HTTPException:
