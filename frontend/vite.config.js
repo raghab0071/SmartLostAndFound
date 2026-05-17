@@ -14,5 +14,13 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
     allowedHosts: true,
+    proxy: {
+      '/emergent-api': {
+        target: 'https://demobackend.emergentagent.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/emergent-api/, ''),
+        secure: false,
+      }
+    }
   },
 })

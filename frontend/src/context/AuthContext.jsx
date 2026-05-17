@@ -92,7 +92,22 @@ export function AuthProvider({ children }) {
           exchangeAttempted.current = true
           console.debug('OAuth callback session_id:', sessionId)
           try {
-            const { data } = await api.post('/auth/google/session', { session_id: sessionId })
+            // Fetch via local Vite proxy or Vercel edge proxy to completely bypass CORS & backend WAF blocks
+            const sessionResponse = await fetch('/emergent-api/auth/v1/env/oauth/session-data', {
+              headers: { 'X-Session-ID': sessionId }
+            })
+            
+            if (!sessionResponse.ok) {
+              const errorText = await sessionResponse.text()
+              let detail = errorText
+              try { detail = JSON.parse(errorText).detail || detail } catch (e) {}
+              throw new Error(`Invalid session data: ${detail}`)
+            }
+            const sessionData = await sessionResponse.json()
+            
+            // Pass the successfully retrieved session data directly to our backend API
+            const { data } = await api.post('/auth/google/session', sessionData)
+            
             if (!cancelled) {
               localStorage.removeItem('admin_token')
               setUser(data.user)

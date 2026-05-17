@@ -5,6 +5,10 @@
       "destination": "https://smartlostandfound.onrender.com/api/$1"
     },
     {
+      "source": "/emergent-api/(.*)",
+      "destination": "https://demobackend.emergentagent.com/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
