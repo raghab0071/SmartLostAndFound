@@ -1,13 +1,18 @@
 import os
 import logging
 import asyncio
+import re
+import json
 from datetime import datetime, date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import httpx
 from dotenv import load_dotenv
-from motor.motor_asyncio import AsyncIOMotorClient
+try:
+    from motor.motor_asyncio import AsyncIOMotorClient
+except ImportError:
+    AsyncIOMotorClient = None
 
 load_dotenv(Path(__file__).parent / ".env")
 
@@ -17,9 +22,12 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 MONGO_URL = os.getenv("MONGO_URL")
 DB_NAME = os.getenv("DB_NAME", "lost_found_db")
+JSON_DB_DIR = Path(os.getenv("JSON_DB_DIR", os.getenv("JSON_MIRROR_DIR", Path(__file__).parent / "data")))
+JSON_DB_DIR.mkdir(parents=True, exist_ok=True)
+JSON_PRIMARY = not MONGO_URL
 
 _supabase_client: Optional[httpx.AsyncClient] = None
-if SUPABASE_URL and SUPABASE_KEY:
+if SUPABASE_URL and SUPABASE_KEY and not JSON_PRIMARY:
     _supabase_client = httpx.AsyncClient(
         base_url=SUPABASE_URL.rstrip("/") + "/rest/v1",
         headers={
@@ -31,7 +39,7 @@ if SUPABASE_URL and SUPABASE_KEY:
         timeout=15.0,
     )
 
-_mongo_client = AsyncIOMotorClient(MONGO_URL) if MONGO_URL else None
+_mongo_client = AsyncIOMotorClient(MONGO_URL) if MONGO_URL and AsyncIOMotorClient else None
 _mongo_db = _mongo_client[DB_NAME] if _mongo_client is not None else None
 
 
@@ -140,9 +148,140 @@ def _json_compatible(document: Any) -> Any:
     return _serialize_value(document)
 
 
+def _without_id(document: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if document is None:
+        return None
+    return {k: v for k, v in document.items() if k != "_id"}
+
+
+def _prepare_update_docs(update_doc: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+    """Return (supabase_patch, mongo_update) for Mongo-style or plain updates."""
+    if any(key.startswith("$") for key in update_doc):
+        mongo_update = update_doc
+        unsupported_ops = [key for key in update_doc if key != "$set"]
+        if unsupported_ops:
+            return None, mongo_update
+        set_doc = update_doc.get("$set")
+        if not isinstance(set_doc, dict):
+            raise ValueError("$set update must be a document")
+        return set_doc, mongo_update
+    return update_doc, {"$set": update_doc}
+
+
+def _project_document(document: Dict[str, Any], projection: Optional[Dict[str, int]]) -> Dict[str, Any]:
+    doc = _without_id(document) or {}
+    if not projection:
+        return doc
+    excluded = {key for key, value in projection.items() if value == 0}
+    included = {key for key, value in projection.items() if value == 1}
+    if included:
+        return {key: value for key, value in doc.items() if key in included}
+    return {key: value for key, value in doc.items() if key not in excluded}
+
+
+def _coerce_compare(value: Any) -> Any:
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return value
+    return value
+
+
+def _matches_expression(value: Any, expression: Dict[str, Any]) -> bool:
+    for op, expected in expression.items():
+        if op == "$regex":
+            flags = re.IGNORECASE if "i" in expression.get("$options", "") else 0
+            if re.search(str(expected), str(value or ""), flags) is None:
+                return False
+        elif op == "$options":
+            continue
+        elif op == "$in":
+            if value not in expected:
+                return False
+        elif op == "$gt":
+            if not (_coerce_compare(value) > _coerce_compare(expected)):
+                return False
+        elif op == "$gte":
+            if not (_coerce_compare(value) >= _coerce_compare(expected)):
+                return False
+        elif op == "$lt":
+            if not (_coerce_compare(value) < _coerce_compare(expected)):
+                return False
+        elif op == "$lte":
+            if not (_coerce_compare(value) <= _coerce_compare(expected)):
+                return False
+        else:
+            return False
+    return True
+
+
+def _matches_query(document: Dict[str, Any], query: Dict[str, Any]) -> bool:
+    for key, expected in (query or {}).items():
+        if key == "$or":
+            if not any(_matches_query(document, condition) for condition in expected):
+                return False
+            continue
+        if key == "$and":
+            if not all(_matches_query(document, condition) for condition in expected):
+                return False
+            continue
+        value = document.get(key)
+        if isinstance(expected, dict):
+            if not _matches_expression(value, expected):
+                return False
+        elif value != expected:
+            return False
+    return True
+
+
+def _apply_mongo_update(document: Dict[str, Any], update_doc: Dict[str, Any]) -> Dict[str, Any]:
+    updated = dict(document)
+    for key, value in update_doc.get("$set", {}).items():
+        updated[key] = _json_compatible(value)
+    for key, value in update_doc.get("$inc", {}).items():
+        updated[key] = updated.get(key, 0) + value
+    for key, value in update_doc.get("$addToSet", {}).items():
+        current = updated.get(key)
+        if not isinstance(current, list):
+            current = []
+        if value not in current:
+            current.append(value)
+        updated[key] = current
+    return updated
+
+
+class JsonWriteResult:
+    def __init__(self, modified_count: int = 0, deleted_count: int = 0):
+        self.modified_count = modified_count
+        self.deleted_count = deleted_count
+
+
 class CollectionProxy:
     def __init__(self, name: str):
         self.name = name
+
+    def _json_path(self) -> Path:
+        return JSON_DB_DIR / f"{self.name}.json"
+
+    def _json_read_all(self) -> List[Dict[str, Any]]:
+        path = self._json_path()
+        if not path.exists():
+            return []
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, list) else []
+        except Exception as exc:
+            logger.warning("Failed to read JSON collection %s: %s", self.name, exc)
+            return []
+
+    def _json_write_all(self, documents: List[Dict[str, Any]]):
+        path = self._json_path()
+        tmp = path.with_suffix(".json.tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump([_json_compatible(_without_id(doc)) for doc in documents], f, indent=2)
+        tmp.replace(path)
 
     async def _supabase_request(self, method: str, params: Optional[Sequence[Tuple[str, str]]] = None, json: Any = None, headers: Optional[Dict[str, str]] = None):
         if not _supabase_client:
@@ -200,6 +339,14 @@ class CollectionProxy:
             raise RuntimeError("MongoDB is not configured")
         return _mongo_db[self.name]
 
+    async def _json_select(self, query: Dict[str, Any], projection: Optional[Dict[str, int]] = None, sort: Sequence[tuple] = (), limit: Optional[int] = None):
+        docs = [_project_document(doc, projection) for doc in self._json_read_all() if _matches_query(doc, query)]
+        for key, direction in reversed(sort or []):
+            docs.sort(key=lambda doc: _coerce_compare(doc.get(key)) if doc.get(key) is not None else "", reverse=direction < 0)
+        if limit is not None:
+            docs = docs[:limit]
+        return docs
+
     async def _mirror_to_mongo(self, document: Dict[str, Any]):
         try:
             collection = await self._mongo_collection()
@@ -218,14 +365,15 @@ class CollectionProxy:
         try:
             data = await self._supabase_select(query, sort=(), limit=1)
             if data:
-                return data[0]
+                return _project_document(data[0], projection)
         except Exception:
             pass
-        collection = await self._mongo_collection()
-        result = await collection.find_one(query, projection or {})
-        if result and "_id" in result:
-            result.pop("_id", None)
-        return result
+        if _mongo_db is not None:
+            collection = await self._mongo_collection()
+            result = await collection.find_one(query, projection or {})
+            return _without_id(result)
+        data = await self._json_select(query, projection=projection, limit=1)
+        return data[0] if data else None
 
     def find(self, query: Dict[str, Any], projection: Optional[Dict[str, int]] = None):
         return QueryProxy(self, query, projection)
@@ -236,6 +384,11 @@ class CollectionProxy:
             asyncio.create_task(self._mirror_to_mongo(document))
             return result
         except Exception:
+            if _mongo_db is None:
+                docs = self._json_read_all()
+                docs.append(_json_compatible(_without_id(document)))
+                self._json_write_all(docs)
+                return document
             collection = await self._mongo_collection()
             await collection.insert_one(_json_compatible(document))
             return document
@@ -246,28 +399,72 @@ class CollectionProxy:
             asyncio.create_task(self._mirror_many_to_mongo(documents))
             return result
         except Exception:
+            if _mongo_db is None:
+                docs = self._json_read_all()
+                docs.extend([_json_compatible(_without_id(doc)) for doc in documents])
+                self._json_write_all(docs)
+                return documents
             collection = await self._mongo_collection()
             await collection.insert_many([_json_compatible(doc) for doc in documents])
             return documents
 
     async def update_one(self, query: Dict[str, Any], update_doc: Dict[str, Any]):
+        supabase_patch, mongo_update = _prepare_update_docs(update_doc)
         try:
-            return await self._supabase_update(query, update_doc, many=False)
+            if supabase_patch is None:
+                raise ValueError("Update operator requires Mongo fallback")
+            return await self._supabase_update(query, supabase_patch, many=False)
         except Exception:
+            if _mongo_db is None:
+                docs = self._json_read_all()
+                modified = 0
+                for index, doc in enumerate(docs):
+                    if _matches_query(doc, query):
+                        docs[index] = _apply_mongo_update(doc, mongo_update)
+                        modified = 1
+                        break
+                if modified:
+                    self._json_write_all(docs)
+                return JsonWriteResult(modified_count=modified)
             collection = await self._mongo_collection()
-            return await collection.update_one(query, {"$set": update_doc})
+            return await collection.update_one(query, mongo_update)
 
     async def update_many(self, query: Dict[str, Any], update_doc: Dict[str, Any]):
+        supabase_patch, mongo_update = _prepare_update_docs(update_doc)
         try:
-            return await self._supabase_update(query, update_doc, many=True)
+            if supabase_patch is None:
+                raise ValueError("Update operator requires Mongo fallback")
+            return await self._supabase_update(query, supabase_patch, many=True)
         except Exception:
+            if _mongo_db is None:
+                docs = self._json_read_all()
+                modified = 0
+                for index, doc in enumerate(docs):
+                    if _matches_query(doc, query):
+                        docs[index] = _apply_mongo_update(doc, mongo_update)
+                        modified += 1
+                if modified:
+                    self._json_write_all(docs)
+                return JsonWriteResult(modified_count=modified)
             collection = await self._mongo_collection()
-            return await collection.update_many(query, {"$set": update_doc})
+            return await collection.update_many(query, mongo_update)
 
     async def delete_one(self, query: Dict[str, Any]):
         try:
             return await self._supabase_delete(query)
         except Exception:
+            if _mongo_db is None:
+                docs = self._json_read_all()
+                kept = []
+                deleted = 0
+                for doc in docs:
+                    if deleted == 0 and _matches_query(doc, query):
+                        deleted = 1
+                        continue
+                    kept.append(doc)
+                if deleted:
+                    self._json_write_all(kept)
+                return JsonWriteResult(deleted_count=deleted)
             collection = await self._mongo_collection()
             return await collection.delete_one(query)
 
@@ -275,6 +472,13 @@ class CollectionProxy:
         try:
             return await self._supabase_delete(query)
         except Exception:
+            if _mongo_db is None:
+                docs = self._json_read_all()
+                kept = [doc for doc in docs if not _matches_query(doc, query)]
+                deleted = len(docs) - len(kept)
+                if deleted:
+                    self._json_write_all(kept)
+                return JsonWriteResult(deleted_count=deleted)
             collection = await self._mongo_collection()
             return await collection.delete_many(query)
 
@@ -282,6 +486,8 @@ class CollectionProxy:
         try:
             return await self._supabase_count(query)
         except Exception:
+            if _mongo_db is None:
+                return len([doc for doc in self._json_read_all() if _matches_query(doc, query)])
             collection = await self._mongo_collection()
             return await collection.count_documents(query)
 
@@ -289,6 +495,10 @@ class CollectionProxy:
         return AggregateProxy(self, pipeline)
 
     async def command(self, command: str, *args, **kwargs):
+        if _mongo_db is None:
+            if command == "ping":
+                return {"ok": 1}
+            raise RuntimeError("MongoDB is not configured")
         collection = await self._mongo_collection()
         return await collection.database.command(command, *args, **kwargs)
 
@@ -325,6 +535,8 @@ class QueryProxy:
                 return await self.collection._supabase_select(self.query, sort=self._sort, limit=self._limit or length)
             except Exception:
                 pass
+        if _mongo_db is None:
+            return await self.collection._json_select(self.query, projection=self.projection, sort=self._sort, limit=self._limit or length)
         collection = await self.collection._mongo_collection()
         cursor = collection.find(self.query, self.projection)
         if self._sort:
@@ -340,6 +552,8 @@ class DualDatabase:
 
     async def command(self, command: str, *args, **kwargs):
         if _mongo_db is None:
+            if command == "ping":
+                return {"ok": 1}
             raise RuntimeError("MongoDB is not configured")
         return await _mongo_db.command(command, *args, **kwargs)
 

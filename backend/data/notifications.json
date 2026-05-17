@@ -1,1 +1,12 @@
-[]
+[
+  {
+    "notification_id": "ntf_626daf0ea70c",
+    "user_id": "stu_66b2b5a3e28b",
+    "type": "system",
+    "title": "Welcome to FindIt!",
+    "body": "Complete your profile so admins can attribute finds to you.",
+    "link": null,
+    "read": false,
+    "created_at": "2026-05-17T12:39:42.258848+00:00"
+  }
+]

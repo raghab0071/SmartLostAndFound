@@ -13,8 +13,9 @@ from typing import Iterable
 
 logger = logging.getLogger(__name__)
 
-MIRROR_DIR = Path(os.environ.get("JSON_MIRROR_DIR", "./data"))
+MIRROR_DIR = Path(os.environ.get("JSON_MIRROR_DIR", Path(__file__).parent / "data"))
 MIRROR_DIR.mkdir(parents=True, exist_ok=True)
+JSON_IS_PRIMARY_STORE = not os.environ.get("MONGO_URL")
 
 # Collections to mirror. Exclude session tokens & matches for noise/privacy.
 MIRRORED = ["users", "found_items", "lost_items", "claims", "centres", "notifications"]
@@ -36,7 +37,7 @@ def _sanitize(doc: dict) -> dict:
     for k, v in doc.items():
         if k == "_id":
             continue
-        if k == "password_hash":
+        if k == "password_hash" and not JSON_IS_PRIMARY_STORE:
             out[k] = "***"  # redact
             continue
         out[k] = v

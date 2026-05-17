@@ -94,6 +94,7 @@ export function AuthProvider({ children }) {
           try {
             const { data } = await api.post('/auth/google/session', { session_id: sessionId })
             if (!cancelled) {
+              localStorage.removeItem('admin_token')
               setUser(data.user)
               setAuthError(null)
               toast.success(`Welcome, ${data.user.name}!`)
@@ -138,6 +139,9 @@ export function AuthProvider({ children }) {
   const FRONTEND_BASE_URL = import.meta.env.VITE_REACT_APP_FRONTEND_URL || window.location.origin
 
   const loginStudentWithGoogle = (redirectPath = '/student') => {
+    localStorage.removeItem('admin_token')
+    setUser(null)
+    setOnboardingState(null)
     sessionStorage.setItem('post_login_redirect', redirectPath)
     const redirectUrl = `${FRONTEND_BASE_URL}/profile`
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`

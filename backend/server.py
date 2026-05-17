@@ -266,12 +266,14 @@ async def google_session(request: Request, payload: GoogleSessionRequest, respon
         "created_at": utc_now(),
     })
 
+    forwarded_proto = request.headers.get("x-forwarded-proto", "")
+    cookie_secure = request.url.scheme == "https" or forwarded_proto.split(",")[0].strip() == "https"
     response.set_cookie(
         key="session_token",
         value=session_token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=cookie_secure,
+        samesite="none" if cookie_secure else "lax",
         max_age=7 * 24 * 60 * 60,
         path="/",
     )
@@ -1104,10 +1106,12 @@ app.add_middleware(
         "https://smart-lost-and-found-wine.vercel.app",
         "https://smartlostandfound.onrender.com",
         "http://localhost:3000",
+        "http://localhost:3001",
         "http://localhost:5173",
         "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
     ],
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1):(3000|5173)$",
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1):(3000|3001|5173)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
