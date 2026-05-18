@@ -529,12 +529,26 @@ async def create_lost_item(payload: LostItemCreate, user: dict = Depends(get_cur
     await dump_collection(db, "lost_items")
 
     # Broadcast to admins based on visibility
+    logger.info(f"Creating lost item with visibility: {payload.visibility}, institute: {user.get('institute')}")
+    
     if payload.visibility == "public":
         admin_query = {"role": "admin"}
+        logger.info(f"Public report - notifying all admins")
     else:
-        admin_query = {"role": "admin", "institute": user.get("institute")}
+        # For institute-only, find admins with matching institute (case-insensitive)
+        import re
+        student_institute = user.get("institute", "").strip().lower()
+        # Escape special regex characters
+        student_institute_escaped = re.escape(student_institute)
+        admin_query = {
+            "role": "admin",
+            "institute": {"$regex": f"^{student_institute_escaped}$", "$options": "i"}
+        }
+        logger.info(f"Institute-only report - notifying admins from institute: {student_institute}")
 
-    admins = await db.users.find(admin_query, {"_id": 0, "user_id": 1}).to_list(length=50)
+    admins = await db.users.find(admin_query, {"_id": 0, "user_id": 1, "institute": 1}).to_list(length=50)
+    logger.info(f"Found {len(admins)} admins to notify: {[a.get('institute') for a in admins]}")
+    
     for a in admins:
         await _notify(
             user_id=a["user_id"],
@@ -589,19 +603,46 @@ async def list_lost_items(
         # Students see only their own lost items
         query["reported_by_user_id"] = user["user_id"]
     elif user.get("role") == "admin":
-        # Admins see only reports for their institute
+        # Admins see:
+        # 1. All public reports (visibility: "public")
+        # 2. Institute-only reports matching their institute
         institute = user.get("institute")
+        logger.info(f"Admin {user.get('user_id')} with institute '{institute}' fetching lost items")
+        
         if institute:
-            query["reported_by_institute"] = institute
+            # Normalize institute name for comparison - escape special regex characters
+            import re
+            institute_normalized = institute.strip().lower()
+            # Escape special regex characters
+            institute_escaped = re.escape(institute_normalized)
+            
+            # Match public OR (institute-only AND same institute)
+            query["$or"] = [
+                {"visibility": {"$in": ["public", None]}},  # Public or no visibility set
+                {
+                    "$and": [
+                        {"visibility": "institute_only"},
+                        {"reported_by_institute": {"$regex": f"^{institute_escaped}$", "$options": "i"}}
+                    ]
+                }
+            ]
+            logger.info(f"Admin query with escaped regex: {query}")
         else:
-            return []
+            # Admin without institute can only see public reports
+            query["visibility"] = {"$in": ["public", None]}
+    
     if status:
         if "$or" in query:
+            # If we already have $or, wrap everything in $and
             query = {"$and": [query, {"status": status}]}
         else:
             query["status"] = status
+    
+    logger.info(f"Final query for user {user.get('user_id')}: {query}")
     cursor = db.lost_items.find(query, {"_id": 0}).sort("created_at", -1).limit(limit)
-    return await cursor.to_list(length=limit)
+    items = await cursor.to_list(length=limit)
+    logger.info(f"Found {len(items)} lost items for user {user.get('user_id')}")
+    return items
 
 
 @api.get("/items/lost/alerts/recent", response_model=List[LostItem])
@@ -858,10 +899,8 @@ async def close_claim(claim_id: str, decision: ClaimDecision, admin: dict = Depe
         {"reported_by_user_id": claim["claimant_user_id"], "status": {"$in": ["open", "matched"]}},
         {"$set": {"status": "claimed"}}
     )
-    # Award claimant
-    await _award_points(claim["claimant_user_id"], 30, badge="Reunited",
-                        reason=f"You recovered '{claim['found_item_title']}'! +30 pts")
     # Award the original finder (by roll_no on the found item)
+    # NOTE: Do NOT award the claimant. Only the finder gets points.
     found_item = await db.found_items.find_one({"item_id": claim["found_item_id"]}, {"_id": 0})
     await _award_finder_by_roll_no(found_item, claim)
     return updated
@@ -920,10 +959,15 @@ async def update_centre(centre_id: str, payload: CentreCreate, admin: dict = Dep
     # Only the owning admin (or any admin if unowned) can update
     if existing.get("managed_by_admin_id") and existing["managed_by_admin_id"] != admin["user_id"]:
         raise HTTPException(status_code=403, detail="You can only edit centres you manage")
+    
     update_doc = payload.model_dump()
+    logger.info(f"Updating centre {centre_id}: {update_doc}")
+    
     await db.centres.update_one({"centre_id": centre_id}, {"$set": update_doc})
     await dump_collection(db, "centres")
+    
     item = await db.centres.find_one({"centre_id": centre_id}, {"_id": 0})
+    logger.info(f"Updated centre {centre_id}: is_open={item.get('is_open')}")
     return item
 
 

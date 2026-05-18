@@ -241,6 +241,7 @@ class CentreCreate(BaseModel):
     contact_email: Optional[str] = None
     hours: Optional[str] = None
     image: Optional[str] = None
+    is_open: bool = True  # NEW — centre open/closed status
 
 
 class Centre(BaseModel):
@@ -254,6 +255,7 @@ class Centre(BaseModel):
     contact_email: Optional[str] = None
     hours: Optional[str] = None
     image: Optional[str] = None
+    is_open: bool = True  # NEW — centre open/closed status
     managed_by_admin_id: Optional[str] = None
     managed_by_admin_name: Optional[str] = None
     created_at: datetime = Field(default_factory=utc_now)

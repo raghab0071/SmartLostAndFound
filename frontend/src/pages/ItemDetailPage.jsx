@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import api, { API_BASE } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
-import { ArrowLeft, MapPin, Calendar, Tag, User, Shield, Send, QrCode, X, Image as ImageIcon, AlertCircle } from 'lucide-react'
+import { ArrowLeft, MapPin, Calendar, Tag, User, Shield, Send, QrCode, X, Image as ImageIcon, AlertCircle, Share2, Copy, Check } from 'lucide-react'
 import { Spinner } from '../components/Common.jsx'
 
 export default function ItemDetailPage() {
@@ -14,6 +14,8 @@ export default function ItemDetailPage() {
   const [loading, setLoading] = useState(true)
   const [claimOpen, setClaimOpen] = useState(false)
   const [qrOpen, setQrOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const canEditItem = (item) => {
     if (!isAdmin || !user || !item) return false
@@ -76,6 +78,13 @@ export default function ItemDetailPage() {
             >
               <QrCode className="w-4 h-4" /> View QR
             </button>
+            <button
+              data-testid="share-btn"
+              onClick={() => setShareOpen(true)}
+              className="btn-ghost"
+            >
+              <Share2 className="w-4 h-4" /> Share
+            </button>
             {!user && (
               <Link to="/login/student" className="btn-primary" data-testid="login-to-claim-btn">
                 <Send className="w-4 h-4" /> Sign in to claim
@@ -116,6 +125,39 @@ export default function ItemDetailPage() {
               alt="QR"
               className="w-64 h-64"
             />
+          </div>
+        </Modal>
+      )}
+
+      {shareOpen && (
+        <Modal onClose={() => setShareOpen(false)} testid="share-modal">
+          <h3 className="text-lg font-bold text-brand-900 mb-1">Share this item</h3>
+          <p className="text-sm text-brand-900/60 mb-4">Anyone can view this public item page using the link below.</p>
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                readOnly
+                value={`${window.location.origin}/items/${item.item_id}`}
+                className="input flex-1 text-sm"
+                data-testid="share-link-input"
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/items/${item.item_id}`)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                  toast.success('Link copied!')
+                }}
+                data-testid="copy-link-btn"
+                className="btn-ghost"
+              >
+                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              </button>
+            </div>
+            <div className="text-xs text-brand-900/60">
+              Share via email, messaging, or social media to help find the owner.
+            </div>
           </div>
         </Modal>
       )}

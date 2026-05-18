@@ -82,7 +82,7 @@ useEffect(() => {
           const isNear = yourInstitute && (c.institute || '').toLowerCase().includes(user.institute.toLowerCase())
           return (
             <Link key={c.centre_id} to={`/centres/${c.centre_id}`} data-testid={`centre-card-${c.centre_id}`}
-              className="card overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 group">
+              className="card overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300 group relative">
               <div className="aspect-[16/9] bg-brand-50 overflow-hidden relative">
                 {c.image ? (
                   <img src={c.image} alt={c.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -94,6 +94,16 @@ useEffect(() => {
                     YOUR CAMPUS
                   </span>
                 )}
+                {/* Centre Status Badge - Text only for all users */}
+                <div className="absolute top-3 right-3">
+                  <span className={`px-3 py-1 rounded-full text-sm font-bold text-white ${
+                    c.is_open !== false
+                      ? 'bg-green-400 text-white border border-green-400 hover:bg-green-600'
+  : 'bg-red-500 text-white border border-red-400 hover:bg-red-600'
+                  }`}>
+                    {c.is_open !== false ? 'OPEN' : 'CLOSE'}
+                  </span>
+                </div>
               </div>
               <div className="p-5 space-y-3">
                 <div>

@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../lib/api'
+import { useAuth } from '../context/AuthContext'
 import { MapPin, Phone, Mail, Clock, ArrowLeft, Building2, Package } from 'lucide-react'
 import { Spinner, EmptyState } from '../components/Common.jsx'
 import ItemCard from '../components/ItemCard.jsx'
 
 export default function CentreDetailPage() {
   const { centreId } = useParams()
+  const { user } = useAuth()
   const [centre, setCentre] = useState(null)
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -44,8 +46,18 @@ export default function CentreDetailPage() {
           )}
         </div>
         <div className="p-6 md:p-8">
-          <h1 className="text-3xl md:text-4xl font-extrabold text-brand-900">{centre.name}</h1>
-          {centre.description && <p className="text-brand-900/70 mt-2 max-w-2xl">{centre.description}</p>}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <h1 className="text-3xl md:text-4xl font-extrabold text-brand-900">{centre.name}</h1>
+              {centre.description && <p className="text-brand-900/70 mt-2 max-w-2xl">{centre.description}</p>}
+            </div>
+            {/* Centre Status Badge - Text only */}
+            <span className={`px-3 py-1 rounded-full text-sm font-bold text-white ${
+              centre.is_open !== false ? 'bg-green-500' : 'bg-red-500'
+            }`}>
+              {centre.is_open !== false ? 'OPEN' : 'CLOSE'}
+            </span>
+          </div>
           <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-3 mt-5 text-sm">
             <Info icon={MapPin} label="Location" value={centre.location} />
             {centre.building && <Info icon={Building2} label="Building" value={centre.building} />}

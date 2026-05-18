@@ -6,18 +6,29 @@ import { SectionTitle, Spinner, EmptyState } from '../../components/Common.jsx'
 
 const EMPTY = {
   name: '', description: '', location: '', building: '', institute: '',
-  contact_phone: '', contact_email: '', hours: '', image: '',
+  contact_phone: '', contact_email: '', hours: '', image: '', is_open: true,
 }
 
 export default function AdminCentres() {
   const [centres, setCentres] = useState([])
   const [loading, setLoading] = useState(true)
-  const [editing, setEditing] = useState(null) // null | {centre_id?, ...}
+  const [editing, setEditing] = useState(null)
+  const [togglingId, setTogglingId] = useState(null)
 
   const load = () => {
     setLoading(true)
-    api.get('/centres', { params: { mine: true } }).then(({ data }) => setCentres(data || [])).finally(() => setLoading(false))
+    api.get('/centres', { params: { mine: true } })
+      .then(({ data }) => {
+        console.log('Loaded centres:', data)
+        setCentres(data || [])
+      })
+      .catch((err) => {
+        console.error('Failed to load centres:', err)
+        toast.error('Failed to load centres')
+      })
+      .finally(() => setLoading(false))
   }
+
   useEffect(load, [])
 
   const save = async (e) => {
@@ -35,7 +46,57 @@ export default function AdminCentres() {
       setEditing(null)
       load()
     } catch (e) {
-      toast.error(e.message || 'Failed')
+      toast.error(e.response?.data?.detail || e.message || 'Failed')
+    }
+  }
+
+  const handleToggle = async (centre) => {
+    const centreId = centre.centre_id
+    setTogglingId(centreId)
+    
+    try {
+      const newIsOpen = !centre.is_open
+      console.log(`Toggling centre ${centreId}: ${centre.is_open} -> ${newIsOpen}`)
+      
+      // Build complete payload with all required fields
+      const payload = {
+        name: centre.name,
+        description: centre.description || '',
+        location: centre.location,
+        building: centre.building || '',
+        institute: centre.institute || '',
+        contact_phone: centre.contact_phone || '',
+        contact_email: centre.contact_email || '',
+        hours: centre.hours || '',
+        image: centre.image || '',
+        is_open: newIsOpen
+      }
+      
+      console.log('Sending payload:', payload)
+      const response = await api.put(`/centres/${centreId}`, payload)
+      console.log('Response:', response.data)
+      
+      toast.success(newIsOpen ? 'Centre opened' : 'Centre closed')
+      
+      // Update local state immediately
+      setCentres(prevCentres => 
+        prevCentres.map(c => 
+          c.centre_id === centreId ? { ...c, is_open: newIsOpen } : c
+        )
+      )
+      
+      // Reload after a short delay to ensure sync
+      setTimeout(() => {
+        load()
+      }, 500)
+    } catch (err) {
+      console.error('Toggle error:', err)
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to toggle centre status'
+      toast.error(errorMsg)
+      // Reload on error to sync state
+      load()
+    } finally {
+      setTogglingId(null)
     }
   }
 
@@ -57,13 +118,30 @@ export default function AdminCentres() {
       <SectionTitle
         kicker="Locations"
         title="Manage centres"
-        action={<button data-testid="add-centre-btn" onClick={() => setEditing({ ...EMPTY })} className="btn-primary"><Plus className="w-4 h-4" /> New centre</button>}
+        action={<button data-testid="add-centre-btn" onClick={() => setEditing({ ...EMPTY, is_open: true })} className="btn-primary"><Plus className="w-4 h-4" /> New centre</button>}
       />
       {centres.length === 0 && <EmptyState icon={MapPin} title="No centres yet" testid="admin-centres-empty" />}
       <div className="grid md:grid-cols-2 gap-5">
         {centres.map((c) => (
-          <div key={c.centre_id} className="card p-5" data-testid={`admin-centre-${c.centre_id}`}>
-            <div className="flex items-start gap-3">
+          <div key={c.centre_id} className="card p-5 relative" data-testid={`admin-centre-${c.centre_id}`}>
+            {/* Status Toggle Button - Top Right */}
+            <div className="absolute top-3 right-3">
+              <button
+                type="button"
+                onClick={() => handleToggle(c)}
+                disabled={togglingId === c.centre_id}
+                data-testid={`toggle-centre-status-${c.centre_id}`}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-all border cursor-pointer ${
+    c.is_open
+      ? 'bg-green-500/20 text-green-400 border-green-500/40 hover:bg-green-500/30'
+      : 'bg-green-500/20 text-white-400 border-green-600/40 hover:bg-green-500/30'
+  } disabled:opacity-50 disabled:cursor-not-allowed`}
+>
+                {togglingId === c.centre_id ? 'Updating...' : (c.is_open !== false ? 'OPEN' : 'CLOSE')}
+              </button>
+            </div>
+            
+            <div className="flex items-start gap-3 pr-28">
               <div className="w-12 h-12 rounded-xl bg-brand-50 grid place-items-center text-brand-700 shrink-0">
                 <MapPin className="w-5 h-5" />
               </div>
