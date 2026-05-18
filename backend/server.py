@@ -669,6 +669,33 @@ async def get_lost_item(item_id: str, user: dict = Depends(get_current_user)):
     return item
 
 
+@api.delete("/items/lost/{item_id}")
+async def delete_lost_item(item_id: str, user: dict = Depends(get_current_user)):
+    """Delete a lost item report. Only the student who reported it can delete."""
+    item = await db.lost_items.find_one({"item_id": item_id}, {"_id": 0})
+    if not item:
+        raise HTTPException(status_code=404, detail="Lost item not found")
+    
+    # Only the student who reported it can delete
+    if item.get("reported_by_user_id") != user["user_id"]:
+        raise HTTPException(status_code=403, detail="You can only delete your own reports")
+    
+    logger.info(f"Deleting lost item {item_id} reported by {user['user_id']}")
+    
+    # Delete the lost item
+    await db.lost_items.delete_one({"item_id": item_id})
+    
+    # Delete associated matches
+    await db.matches.delete_many({"lost_item_id": item_id})
+    
+    # Persist changes
+    await dump_collection(db, "lost_items")
+    await dump_collection(db, "matches")
+    
+    logger.info(f"Successfully deleted lost item {item_id} and associated matches")
+    return {"message": "Lost item deleted successfully"}
+
+
 # ---------- AI MATCHES ----------
 @api.get("/ai/match/{lost_item_id}", response_model=List[MatchResult])
 async def get_matches_for_lost(lost_item_id: str, user: dict = Depends(get_current_user)):

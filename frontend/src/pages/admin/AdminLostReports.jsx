@@ -8,17 +8,29 @@ export default function AdminLostReports() {
   const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(true)
   const [matches, setMatches] = useState({})
+  const [claims, setClaims] = useState({}) // {foundItemId: claim}
 
   useEffect(() => {
     // Fetch lost items that are visible to this admin
     // For admins: shows public reports + institute-only reports matching their institute
-    api.get('/items/lost', { params: { limit: 200 } })
-      .then(({ data }) => setReports(data || []))
-      .catch((err) => {
-        console.error('Failed to fetch lost reports:', err)
-        setReports([])
-      })
-      .finally(() => setLoading(false))
+    Promise.all([
+      api.get('/items/lost', { params: { limit: 200 } })
+        .then(({ data }) => setReports(data || []))
+        .catch((err) => {
+          console.error('Failed to fetch lost reports:', err)
+          setReports([])
+        }),
+      api.get('/claims')
+        .then(({ data }) => {
+          // Build map of found_item_id -> claim for quick lookup
+          const claimsMap = {}
+          data.forEach(c => {
+            claimsMap[c.found_item_id] = c
+          })
+          setClaims(claimsMap)
+        })
+        .catch(() => {})
+    ]).finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
@@ -38,8 +50,14 @@ export default function AdminLostReports() {
       <div className="space-y-4">
         {reports.map((r) => {
           const m = matches[r.item_id] || []
+          const isClaimed = r.status === 'claimed'
+          
           return (
-            <div key={r.item_id} className="card p-5" data-testid={`admin-lost-${r.item_id}`}>
+            <div 
+              key={r.item_id} 
+              className={`card p-5 transition-all ${isClaimed ? 'opacity-50 blur-sm' : ''}`}
+              data-testid={`admin-lost-${r.item_id}`}
+            >
               <div className="flex flex-wrap items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -63,15 +81,31 @@ export default function AdminLostReports() {
                     <Sparkles className="w-3 h-3" /> Top AI matches
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {m.slice(0, 3).map((mm) => (
-                      <Link
-                        key={mm.found_item_id}
-                        to={`/items/${mm.found_item_id}`}
-                        className="chip bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100"
-                      >
-                        <span className="font-extrabold">{mm.similarity}%</span> {mm.title}
-                      </Link>
-                    ))}
+                    {m.slice(0, 3).map((mm) => {
+                      const claim = claims[mm.found_item_id]
+                      const claimStatus = claim?.status
+                      
+                      return (
+                        <Link
+                          key={mm.found_item_id}
+                          to={`/items/${mm.found_item_id}`}
+                          className="chip bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100 flex items-center gap-2"
+                        >
+                          <span className="font-extrabold">{mm.similarity}%</span>
+                          <span>{mm.title}</span>
+                          {claimStatus && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ml-1 ${
+                              claimStatus === 'approved' ? 'bg-green-200 text-green-700' :
+                              claimStatus === 'rejected' ? 'bg-red-200 text-red-700' :
+                              claimStatus === 'more_proof_requested' ? 'bg-yellow-200 text-yellow-700' :
+                              'bg-blue-200 text-blue-700'
+                            }`}>
+                              {claimStatus.replace(/_/g, ' ')}
+                            </span>
+                          )}
+                        </Link>
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -82,3 +116,4 @@ export default function AdminLostReports() {
     </div>
   )
 }
+
