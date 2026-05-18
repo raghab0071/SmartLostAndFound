@@ -96,18 +96,25 @@ export default function StudentMyReports() {
             <div 
               key={r.item_id} 
               data-testid={`my-report-${r.item_id}`} 
-              className={`card p-5 relative transition-all ${highlight ? 'ring-2 ring-amber-400' : ''} ${isClaimed ? 'opacity-50 blur-sm' : ''}`}
+              className={`card p-5 relative transition-all ${highlight ? 'ring-2 ring-amber-400' : ''} ${isClaimed ? 'border-2 border-green-500' : ''}`}
             >
-              {/* Delete Button */}
+              {/* Delete Button - Disabled when claimed */}
               <button
                 onClick={() => handleDelete(r.item_id)}
-                disabled={deleting[r.item_id]}
+                disabled={deleting[r.item_id] || isClaimed}
                 data-testid={`delete-report-${r.item_id}`}
-                className="absolute top-3 right-3 w-8 h-8 grid place-items-center rounded-full hover:bg-red-50 disabled:opacity-50"
-                title="Delete this report"
+                className="absolute top-3 right-3 w-8 h-8 grid place-items-center rounded-full hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={isClaimed ? "Cannot delete claimed report" : "Delete this report"}
               >
                 <Trash2 className="w-4 h-4 text-red-600" />
               </button>
+
+              {/* Resolved Status Badge - Show when claimed */}
+              {isClaimed && (
+                <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-500">
+                  ✓ Resolved
+                </div>
+              )}
 
               <div className="flex flex-wrap items-start gap-3 pr-12">
                 <div className="flex-1 min-w-0">
@@ -125,8 +132,9 @@ export default function StudentMyReports() {
                 <button
                   data-testid={`refresh-matches-${r.item_id}`}
                   onClick={() => refresh(r.item_id)}
-                  disabled={!!refreshing[r.item_id]}
-                  className="btn-ghost text-xs disabled:opacity-60"
+                  disabled={!!refreshing[r.item_id] || isClaimed}
+                  className="btn-ghost text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                  title={isClaimed ? "Cannot re-run AI for claimed report" : "Re-run AI matching"}
                 >
                   <RefreshCcw className={`w-3.5 h-3.5 ${refreshing[r.item_id] ? 'animate-spin' : ''}`} /> Re-run AI
                 </button>

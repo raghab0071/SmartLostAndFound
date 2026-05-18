@@ -55,9 +55,16 @@ export default function AdminLostReports() {
           return (
             <div 
               key={r.item_id} 
-              className={`card p-5 transition-all ${isClaimed ? 'opacity-50 blur-sm' : ''}`}
+              className={`card p-5 transition-all ${isClaimed ? 'border-2 border-green-500' : ''}`}
               data-testid={`admin-lost-${r.item_id}`}
             >
+              {/* Resolved Status Badge - Show when claimed */}
+              {isClaimed && (
+                <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-500">
+                  ✓ Resolved
+                </div>
+              )}
+
               <div className="flex flex-wrap items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
