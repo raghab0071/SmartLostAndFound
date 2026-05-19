@@ -1,6 +1,7 @@
 import React from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { useAuth } from './context/AuthContext.jsx'
+import { ThemeProvider } from './context/ThemeContext.jsx'
 import Navbar from './components/Navbar.jsx'
 import Footer from './components/Footer.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
@@ -38,72 +39,74 @@ import AdminCentres from './pages/admin/AdminCentres.jsx'
 export default function App() {
   const { user } = useAuth()
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-1">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/browse" element={<BrowsePage />} />
-          <Route path="/centres" element={<CentresPage />} />
-          <Route path="/centres/:centreId" element={<CentreDetailPage />} />
-          <Route path="/notices" element={<NoticesPage />} />
-          <Route path="/leaderboard" element={<LeaderboardPage />} />
-          <Route path="/items/:itemId" element={<ItemDetailPage />} />
-          <Route path="/login/student" element={<StudentLoginPage />} />
-          <Route path="/login/admin" element={<AdminLoginPage />} />
-          <Route path="/profile" element={<OauthRedirectPage />} />
-          <Route
-            path="/me"
-            element={
-              <ProtectedRoute>
-                <UserProfilePage />
-              </ProtectedRoute>
-            }
-          />
+    <ThemeProvider>
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/browse" element={<BrowsePage />} />
+            <Route path="/centres" element={<CentresPage />} />
+            <Route path="/centres/:centreId" element={<CentreDetailPage />} />
+            <Route path="/notices" element={<NoticesPage />} />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
+            <Route path="/items/:itemId" element={<ItemDetailPage />} />
+            <Route path="/login/student" element={<StudentLoginPage />} />
+            <Route path="/login/admin" element={<AdminLoginPage />} />
+            <Route path="/profile" element={<OauthRedirectPage />} />
+            <Route
+              path="/me"
+              element={
+                <ProtectedRoute>
+                  <UserProfilePage />
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Student routes */}
-          <Route
-            path="/student"
-            element={
-              <ProtectedRoute role="student">
-                <StudentLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<StudentDashboard />} />
-            <Route path="report" element={<StudentReport />} />
-            <Route path="my-reports" element={<StudentMyReports />} />
-            <Route path="my-claims" element={<StudentMyClaims />} />
-            <Route path="notifications" element={<StudentNotifications />} />
-          </Route>
+            {/* Student routes */}
+            <Route
+              path="/student"
+              element={
+                <ProtectedRoute role="student">
+                  <StudentLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<StudentDashboard />} />
+              <Route path="report" element={<StudentReport />} />
+              <Route path="my-reports" element={<StudentMyReports />} />
+              <Route path="my-claims" element={<StudentMyClaims />} />
+              <Route path="notifications" element={<StudentNotifications />} />
+            </Route>
 
-          {/* Admin routes */}
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute role="admin">
-                <AdminLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<AdminDashboard />} />
-            <Route path="found" element={<AdminFoundItems />} />
-            <Route path="found/new" element={<AdminFoundItemForm />} />
-            <Route path="found/:itemId/edit" element={<AdminFoundItemForm />} />
-            <Route path="lost" element={<AdminLostReports />} />
-            <Route path="claims" element={<AdminClaims />} />
-            <Route path="centres" element={<AdminCentres />} />
-          </Route>
+            {/* Admin routes */}
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute role="admin">
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<AdminDashboard />} />
+              <Route path="found" element={<AdminFoundItems />} />
+              <Route path="found/new" element={<AdminFoundItemForm />} />
+              <Route path="found/:itemId/edit" element={<AdminFoundItemForm />} />
+              <Route path="lost" element={<AdminLostReports />} />
+              <Route path="claims" element={<AdminClaims />} />
+              <Route path="centres" element={<AdminCentres />} />
+            </Route>
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </main>
-      <Footer />
-      {/* Onboarding overlays — only render when needed */}
-      {user && !user.profile_complete && <ProfileCompletionModal />}
-      {user?.role === 'admin' && user.profile_complete && <AdminCentreOnboardingModal />}
-      <FloatingTipsWidget />
-    </div>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </main>
+        <Footer />
+        {/* Onboarding overlays — only render when needed */}
+        {user && !user.profile_complete && <ProfileCompletionModal />}
+        {user?.role === 'admin' && user.profile_complete && <AdminCentreOnboardingModal />}
+        <FloatingTipsWidget />
+      </div>
+    </ThemeProvider>
   )
 }
 

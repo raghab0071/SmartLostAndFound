@@ -131,7 +131,7 @@ export default function AdminCentres() {
                 onClick={() => handleToggle(c)}
                 disabled={togglingId === c.centre_id}
                 data-testid={`toggle-centre-status-${c.centre_id}`}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all border cursor-pointer ${
+                className={`px-2 py-1 rounded-lg text-sm font-bold transition-all border cursor-pointer ${
                   c.is_open
                     ? 'bg-green-500 text-white border-green-600 hover:bg-green-600'
                     : 'bg-red-500 text-white border-red-600 hover:bg-red-600'

@@ -36,9 +36,24 @@ export default function StudentDashboard() {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Stat testid="stat-points" label="Points" value={user?.points || 0} icon={Trophy} accent="amber" sub="Earn 50 pts per successful claim" />
-        <Stat testid="stat-active-reports" label="Active reports" value={activeReports} icon={FileText} accent="brand" />
-        <Stat testid="stat-pending-claims" label="Open claims" value={pendingClaims} icon={Inbox} accent="indigo" />
-        <Stat testid="stat-recovered" label="Recovered" value={approved} icon={TrendingUp} accent="emerald" />
+        <div className="relative">
+          <Stat testid="stat-active-reports" label="Active reports" value={activeReports} icon={FileText} accent="brand" />
+          {activeReports > 0 && (
+            <div className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-white" title="New updates" />
+          )}
+        </div>
+        <div className="relative">
+          <Stat testid="stat-pending-claims" label="Open claims" value={pendingClaims} icon={Inbox} accent="indigo" />
+          {pendingClaims > 0 && (
+            <div className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-purple-500 ring-2 ring-white" title="New updates" />
+          )}
+        </div>
+        <div className="relative">
+          <Stat testid="stat-recovered" label="Recovered" value={approved} icon={TrendingUp} accent="emerald" />
+          {approved > 0 && (
+            <div className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-white" title="New updates" />
+          )}
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5">

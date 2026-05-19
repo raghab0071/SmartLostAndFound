@@ -76,9 +76,24 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Stat testid="admin-stat-found" label="Total found" value={t.found} icon={Package} accent="brand" sub={`${t.open_found} currently open`} />
-        <Stat testid="admin-stat-lost" label="Lost reports" value={t.lost} icon={FileSearch} accent="rose" />
-        <Stat testid="admin-stat-pending" label="Pending claims" value={t.pending_claims} icon={ClipboardCheck} accent="amber" />
+        <div className="relative">
+          <Stat testid="admin-stat-found" label="Total found" value={t.found} icon={Package} accent="brand" sub={`${t.open_found} currently open`} />
+          {t.found > 0 && (
+            <div className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-white" title="New items" />
+          )}
+        </div>
+        <div className="relative">
+          <Stat testid="admin-stat-lost" label="Lost reports" value={t.lost} icon={FileSearch} accent="rose" />
+          {t.lost > 0 && (
+            <div className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white" title="New reports" />
+          )}
+        </div>
+        <div className="relative">
+          <Stat testid="admin-stat-pending" label="Pending claims" value={t.pending_claims} icon={ClipboardCheck} accent="amber" />
+          {t.pending_claims > 0 && (
+            <div className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white" title="New claims" />
+          )}
+        </div>
         <Stat testid="admin-stat-recovery" label="Recovery rate" value={`${t.recovery_rate}%`} icon={TrendingUp} accent="emerald" sub={`${t.returned} returned`} />
         <Stat testid="admin-stat-centres" label="Centres" value={t.centres} icon={MapPin} accent="indigo" />
         <Stat testid="admin-stat-students" label="Students" value={t.students} icon={Users} accent="brand" />

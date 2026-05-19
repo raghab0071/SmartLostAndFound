@@ -113,6 +113,31 @@ class FoundItem(BaseModel):
     images: List[str] = Field(default_factory=list)
     centre_id: Optional[str] = None
     qr_payload: Optional[str] = None
+
+
+class FoundItemAdmin(BaseModel):
+    """Admin-only response model that includes roll_no and institute"""
+    item_id: str
+    title: str
+    description: str
+    category: str
+    color: Optional[str] = None
+    brand: Optional[str] = None
+    location_found: str
+    building: Optional[str] = None
+    date_found: Optional[str] = None
+    submitted_by_name: Optional[str] = None
+    submitted_by_contact: Optional[str] = None
+    submitted_by_roll_no: Optional[str] = None  # Admin can see this
+    submitted_by_institute: Optional[str] = None  # Admin can see this
+    images: List[str] = Field(default_factory=list)
+    centre_id: Optional[str] = None
+    qr_payload: Optional[str] = None
+    posted_by_admin_id: Optional[str] = None
+    posted_by_admin_name: Optional[str] = None
+    status: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
     status: ItemStatus = "open"
     posted_by_admin_id: str
     posted_by_admin_name: Optional[str] = None

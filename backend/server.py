@@ -404,10 +404,14 @@ async def recent_found_items(limit: int = 8):
 
 
 @api.get("/items/found/{item_id}", response_model=FoundItem)
-async def get_found_item(item_id: str):
+async def get_found_item(item_id: str, user: Optional[dict] = Depends(get_current_user_optional)):
     item = await db.found_items.find_one({"item_id": item_id}, {"_id": 0})
     if not item:
         raise HTTPException(status_code=404, detail="Not found")
+    # If admin is viewing, return admin model with roll_no
+    if user and user.get("role") == "admin":
+        return item  # Return full item with roll_no
+    # Otherwise return public model (roll_no will be filtered by response_model)
     return item
 
 
@@ -604,8 +608,8 @@ async def list_lost_items(
         query["reported_by_user_id"] = user["user_id"]
     elif user.get("role") == "admin":
         # Admins see:
-        # 1. All public reports (visibility: "public")
-        # 2. Institute-only reports matching their institute
+        # ONLY institute-only reports matching their institute
+        # (NOT public reports - those are for homepage only)
         institute = user.get("institute")
         logger.info(f"Admin {user.get('user_id')} with institute '{institute}' fetching lost items")
         
@@ -616,20 +620,15 @@ async def list_lost_items(
             # Escape special regex characters
             institute_escaped = re.escape(institute_normalized)
             
-            # Match public OR (institute-only AND same institute)
-            query["$or"] = [
-                {"visibility": {"$in": ["public", None]}},  # Public or no visibility set
-                {
-                    "$and": [
-                        {"visibility": "institute_only"},
-                        {"reported_by_institute": {"$regex": f"^{institute_escaped}$", "$options": "i"}}
-                    ]
-                }
-            ]
+            # Match ONLY institute-only reports from same institute
+            query = {
+                "visibility": "institute_only",
+                "reported_by_institute": {"$regex": f"^{institute_escaped}$", "$options": "i"}
+            }
             logger.info(f"Admin query with escaped regex: {query}")
         else:
-            # Admin without institute can only see public reports
-            query["visibility"] = {"$in": ["public", None]}
+            # Admin without institute sees nothing
+            query = {"item_id": "NONE_WILL_MATCH"}  # Return empty result
     
     if status:
         if "$or" in query:

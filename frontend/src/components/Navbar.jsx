@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Bell, LogOut, Search, ShieldCheck, User as UserIcon, Menu, X, ChevronDown } from 'lucide-react'
+import { useTheme } from '../context/ThemeContext'
+import { Bell, LogOut, Search, ShieldCheck, User as UserIcon, Menu, X, ChevronDown, Moon, Sun } from 'lucide-react'
 
 export default function Navbar() {
   const { user, isAdmin, isStudent, logout, notificationsCount } = useAuth()
+  const { isDark, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [userMenu, setUserMenu] = useState(false)
@@ -41,6 +43,20 @@ export default function Navbar() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* Dark mode toggle */}
+          <button
+            data-testid="theme-toggle"
+            onClick={toggleTheme}
+            className="w-10 h-10 rounded-full grid place-items-center hover:bg-brand-50 transition"
+            title={isDark ? 'Light mode' : 'Dark mode'}
+          >
+            {isDark ? (
+              <Sun className="w-5 h-5 text-amber-500" />
+            ) : (
+              <Moon className="w-5 h-5 text-brand-900/60" />
+            )}
+          </button>
+
           {!user && (
             <>
               <Link to="/login/student" data-testid="nav-student-login" className="btn-ghost text-sm hidden sm:inline-flex">
