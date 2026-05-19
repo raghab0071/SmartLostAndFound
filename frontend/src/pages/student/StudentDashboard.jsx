@@ -108,29 +108,32 @@ export default function StudentDashboard() {
               No lost items reported yet. <Link to="/student/report" className="text-brand-600 hover:underline font-semibold">Report one now</Link>
             </div>
           ) : (
-            data.reports.map((r) => (
-              <Link
-                key={r.item_id}
-                to={`/student/my-reports?focus=${r.item_id}`}
-                className="card p-4 hover:shadow-xl hover:-translate-y-0.5 transition border border-brand-900/5 relative"
-              >
-                <div className="absolute top-3 left-3">
-                  <span className={`chip status-${r.status}`}>{r.status}</span>
-                </div>
-                {r.status === 'claimed' && (
-                  <div className="absolute top-3 right-3 px-2 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-bold border border-green-500">
-                    ✓ Resolved
+            data.reports.map((r) => {
+              const statusLabel = r.status === 'claimed' ? 'returned' : r.status
+              return (
+                <Link
+                  key={r.item_id}
+                  to={`/student/my-reports?focus=${r.item_id}`}
+                  className="card p-4 hover:shadow-xl hover:-translate-y-0.5 transition border border-brand-900/5 relative"
+                >
+                  <div className="absolute top-3 left-3">
+                    <span className={`chip status-${statusLabel}`}>{statusLabel}</span>
                   </div>
-                )}
-                <div className="mt-6">
-                  <h4 className="font-bold text-brand-900 line-clamp-1">{r.title}</h4>
-                  <p className="text-xs text-brand-900/60 mt-1 line-clamp-2">{r.description}</p>
-                  <div className="text-[11px] text-brand-900/60 mt-2 flex items-center gap-1">
-                    <FileText className="w-3 h-3" /> {r.category}
+                  {r.status === 'claimed' && (
+                    <div className="absolute top-3 right-3 px-2 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-bold border border-green-500">
+                      ✓ Resolved
+                    </div>
+                  )}
+                  <div className="mt-6">
+                    <h4 className="font-bold text-brand-900 line-clamp-1">{r.title}</h4>
+                    <p className="text-xs text-brand-900/60 mt-1 line-clamp-2">{r.description}</p>
+                    <div className="text-[11px] text-brand-900/60 mt-2 flex items-center gap-1">
+                      <FileText className="w-3 h-3" /> {r.category}
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))
+                </Link>
+              )
+            })
           )}
         </div>
       </div>

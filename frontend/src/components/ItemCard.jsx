@@ -4,6 +4,8 @@ import { MapPin, Calendar, Tag } from 'lucide-react'
 
 export default function ItemCard({ item, testidPrefix = 'item' }) {
   const img = item.images?.[0]
+  const statusLabel = item.status === 'claim_pending' ? 'pending' : item.status
+  
   return (
     <Link
       to={`/items/${item.item_id}`}
@@ -21,7 +23,7 @@ export default function ItemCard({ item, testidPrefix = 'item' }) {
           <div className="w-full h-full grid place-items-center text-brand-900/30 text-sm">No image</div>
         )}
         <div className="absolute top-3 left-3 flex gap-1.5">
-          <span className={`chip status-${item.status}`}>{item.status}</span>
+          <span className={`chip status-${statusLabel}`}>{statusLabel}</span>
         </div>
         <div className="absolute top-3 right-3">
           <span className="chip bg-white/85 text-brand-900 border border-brand-900/5">

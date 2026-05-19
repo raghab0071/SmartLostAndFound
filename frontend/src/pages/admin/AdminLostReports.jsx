@@ -51,6 +51,7 @@ export default function AdminLostReports() {
         {reports.map((r) => {
           const m = matches[r.item_id] || []
           const isClaimed = r.status === 'claimed'
+          const statusLabel = r.status === 'claimed' ? 'returned' : r.status
           
           return (
             <div 
@@ -68,7 +69,7 @@ export default function AdminLostReports() {
               <div className="flex flex-wrap items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`chip status-${r.status}`}>{r.status}</span>
+                    <span className={`chip status-${statusLabel}`}>{statusLabel}</span>
                     <span className="chip bg-brand-50 text-brand-900 border border-brand-900/10">{r.category}</span>
                   </div>
                   <h3 className="font-bold text-brand-900 text-lg">{r.title}</h3>

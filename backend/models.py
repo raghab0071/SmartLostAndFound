@@ -113,36 +113,11 @@ class FoundItem(BaseModel):
     images: List[str] = Field(default_factory=list)
     centre_id: Optional[str] = None
     qr_payload: Optional[str] = None
-
-
-class FoundItemAdmin(BaseModel):
-    """Admin-only response model that includes roll_no and institute"""
-    item_id: str
-    title: str
-    description: str
-    category: str
-    color: Optional[str] = None
-    brand: Optional[str] = None
-    location_found: str
-    building: Optional[str] = None
-    date_found: Optional[str] = None
-    submitted_by_name: Optional[str] = None
-    submitted_by_contact: Optional[str] = None
-    submitted_by_roll_no: Optional[str] = None  # Admin can see this
-    submitted_by_institute: Optional[str] = None  # Admin can see this
-    images: List[str] = Field(default_factory=list)
-    centre_id: Optional[str] = None
-    qr_payload: Optional[str] = None
+    status: ItemStatus = "open"
     posted_by_admin_id: Optional[str] = None
     posted_by_admin_name: Optional[str] = None
-    status: Optional[str] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
-    status: ItemStatus = "open"
-    posted_by_admin_id: str
-    posted_by_admin_name: Optional[str] = None
-    created_at: datetime = Field(default_factory=utc_now)
-    updated_at: datetime = Field(default_factory=utc_now)
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 
 class FoundItemAdmin(FoundItem):
@@ -178,23 +153,6 @@ class LostItem(BaseModel):
     contact: Optional[str] = None
     images: List[str] = Field(default_factory=list)
     visibility: Literal["public", "institute_only"] = "public"
-    status: LostStatus = "open"
-    reported_by_user_id: str
-    reported_by_name: Optional[str] = None
-    reported_by_email: Optional[str] = None
-    reported_by_institute: Optional[str] = None
-    created_at: datetime = Field(default_factory=utc_now)
-    item_id: str
-    title: str
-    description: str
-    category: str
-    color: Optional[str] = None
-    brand: Optional[str] = None
-    last_seen_location: str
-    building: Optional[str] = None
-    date_lost: Optional[str] = None
-    contact: Optional[str] = None
-    images: List[str] = Field(default_factory=list)
     status: LostStatus = "open"
     reported_by_user_id: str
     reported_by_name: Optional[str] = None

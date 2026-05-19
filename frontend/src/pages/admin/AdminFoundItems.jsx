@@ -19,8 +19,8 @@ export default function AdminFoundItems() {
   useEffect(load, [])
 
   const remove = async (id, status) => {
-    if (status === 'claimed') {
-      toast.error('Cannot delete claimed items')
+    if (status === 'returned' || status === 'closed') {
+      toast.error('Cannot delete resolved items')
       return
     }
     if (!confirm('Delete this item permanently?')) return
@@ -76,7 +76,7 @@ export default function AdminFoundItems() {
           </thead>
           <tbody>
             {filtered.map((i) => {
-              const isClaimed = i.status === 'claimed'
+              const isClaimed = i.status === 'returned' || i.status === 'closed'
               return (
                 <tr key={i.item_id} className={`border-t border-brand-900/5 hover:bg-brand-50/30 ${isClaimed ? 'bg-green-50/30' : ''}`} data-testid={`admin-found-row-${i.item_id}`}>
                   <td className="p-3 flex items-center gap-3">
@@ -98,10 +98,10 @@ export default function AdminFoundItems() {
                     <button onClick={() => setQrItem(i)} title="QR" data-testid={`qr-btn-${i.item_id}`} className="inline-grid place-items-center w-8 h-8 rounded-full hover:bg-brand-50">
                       <QrCode className="w-4 h-4 text-brand-700" />
                     </button>
-                    <Link to={`/admin/found/${i.item_id}/edit`} title={isClaimed ? "Cannot edit claimed items" : "Edit"} data-testid={`edit-btn-${i.item_id}`} className={`inline-grid place-items-center w-8 h-8 rounded-full ${isClaimed ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-50'}`} onClick={(e) => isClaimed && e.preventDefault()}>
+                    <Link to={`/admin/found/${i.item_id}/edit`} title={isClaimed ? "Cannot edit resolved items" : "Edit"} data-testid={`edit-btn-${i.item_id}`} className={`inline-grid place-items-center w-8 h-8 rounded-full ${isClaimed ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-50'}`} onClick={(e) => isClaimed && e.preventDefault()}>
                       <Edit className="w-4 h-4 text-brand-700" />
                     </Link>
-                    <button onClick={() => remove(i.item_id, i.status)} title={isClaimed ? "Cannot delete claimed items" : "Delete"} data-testid={`del-btn-${i.item_id}`} disabled={isClaimed} className={`inline-grid place-items-center w-8 h-8 rounded-full ${isClaimed ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-50'}`}>
+                    <button onClick={() => remove(i.item_id, i.status)} title={isClaimed ? "Cannot delete resolved items" : "Delete"} data-testid={`del-btn-${i.item_id}`} disabled={isClaimed} className={`inline-grid place-items-center w-8 h-8 rounded-full ${isClaimed ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-50'}`}>
                       <Trash2 className="w-4 h-4 text-red-600" />
                     </button>
                   </td>
