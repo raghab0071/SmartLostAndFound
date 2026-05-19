@@ -403,15 +403,18 @@ async def recent_found_items(limit: int = 8):
     return await cursor.to_list(length=limit)
 
 
-@api.get("/items/found/{item_id}", response_model=FoundItem)
+@api.get("/items/found/{item_id}")
 async def get_found_item(item_id: str, user: Optional[dict] = Depends(get_current_user_optional)):
     item = await db.found_items.find_one({"item_id": item_id}, {"_id": 0})
     if not item:
         raise HTTPException(status_code=404, detail="Not found")
-    # If admin is viewing, return admin model with roll_no
+    # If admin is viewing, return full item with roll_no
     if user and user.get("role") == "admin":
-        return item  # Return full item with roll_no
-    # Otherwise return public model (roll_no will be filtered by response_model)
+        return item  # Return full item with roll_no for admin
+    # Otherwise filter out sensitive fields for public
+    if item:
+        item.pop("submitted_by_roll_no", None)
+        item.pop("submitted_by_institute", None)
     return item
 
 

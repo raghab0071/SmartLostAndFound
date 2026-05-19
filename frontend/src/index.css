@@ -13,6 +13,12 @@
   --success: #1aaa6e;
 }
 
+html.dark {
+  --bg: #0f1419;
+  --ink: #f5f7fb;
+  --ink-soft: #a8b5d1;
+}
+
 html, body, #root {
   height: 100%;
 }
@@ -26,6 +32,14 @@ body {
     #f5f7fb;
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+html.dark body {
+  background:
+    radial-gradient(1200px 600px at 90% -10%, rgba(41, 114, 245, 0.05), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(255, 182, 39, 0.05), transparent 55%),
+    #0f1419;
 }
 
 ::selection { background: #2972f5; color: white; }
@@ -36,6 +50,11 @@ body {
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(20, 50, 110, 0.07);
+}
+
+html.dark .glass {
+  background: rgba(11, 21, 48, 0.65);
+  border: 1px solid rgba(255,255,255,0.08);
 }
 
 .dark-glass {
@@ -61,6 +80,9 @@ body {
 .btn-ghost {
   @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-brand-900/10 text-brand-900 font-medium bg-white/70 hover:bg-white transition-all;
 }
+html.dark .btn-ghost {
+  @apply border-white/10 text-white bg-white/5 hover:bg-white/10;
+}
 .btn-danger {
   @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition;
 }
@@ -71,13 +93,22 @@ body {
 .input {
   @apply w-full rounded-xl border border-brand-900/10 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent placeholder:text-slate-400 transition;
 }
+html.dark .input {
+  @apply bg-white/5 border-white/10 text-white placeholder:text-white/40;
+}
 
 .label {
   @apply block text-xs font-semibold uppercase tracking-wider text-brand-900/70 mb-1.5;
 }
+html.dark .label {
+  @apply text-white/70;
+}
 
 .card {
   @apply rounded-2xl bg-white shadow-soft border border-brand-900/5;
+}
+html.dark .card {
+  @apply bg-white/5 border-white/10;
 }
 
 .chip {
@@ -107,8 +138,25 @@ body {
 .status-more_proof_requested { @apply bg-yellow-50 text-yellow-700 border border-yellow-200; }
 .status-closed { @apply bg-slate-100 text-slate-700 border border-slate-200; }
 
+html.dark .status-open { @apply bg-emerald-900/30 text-emerald-300 border-emerald-700; }
+html.dark .status-matched { @apply bg-amber-900/30 text-amber-300 border-amber-700; }
+html.dark .status-claim_pending { @apply bg-orange-900/30 text-orange-300 border-orange-700; }
+html.dark .status-returned { @apply bg-blue-900/30 text-blue-300 border-blue-700; }
+html.dark .status-claimed { @apply bg-blue-900/30 text-blue-300 border-blue-700; }
+html.dark .status-submitted { @apply bg-indigo-900/30 text-indigo-300 border-indigo-700; }
+html.dark .status-verifying { @apply bg-purple-900/30 text-purple-300 border-purple-700; }
+html.dark .status-pending { @apply bg-amber-900/30 text-amber-300 border-amber-700; }
+html.dark .status-approved { @apply bg-emerald-900/30 text-emerald-300 border-emerald-700; }
+html.dark .status-ready_for_pickup { @apply bg-cyan-900/30 text-cyan-300 border-cyan-700; }
+html.dark .status-rejected { @apply bg-red-900/30 text-red-300 border-red-700; }
+html.dark .status-more_proof_requested { @apply bg-yellow-900/30 text-yellow-300 border-yellow-700; }
+html.dark .status-closed { @apply bg-slate-700 text-slate-300 border-slate-600; }
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(20, 50, 110, 0.18); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(20, 50, 110, 0.3); }
+
+html.dark ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); }
+html.dark ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
