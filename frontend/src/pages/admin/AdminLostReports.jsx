@@ -55,7 +55,7 @@ export default function AdminLostReports() {
           return (
             <div 
               key={r.item_id} 
-              className={`card p-5 transition-all ${isClaimed ? 'border-2 border-green-500' : ''}`}
+              className={`card p-5 transition-all ${isClaimed ? 'border-2 border-green-500 bg-green-50/30' : ''}`}
               data-testid={`admin-lost-${r.item_id}`}
             >
               {/* Resolved Status Badge - Show when claimed */}

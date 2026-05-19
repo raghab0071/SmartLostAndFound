@@ -18,7 +18,11 @@ export default function AdminFoundItems() {
   }
   useEffect(load, [])
 
-  const remove = async (id) => {
+  const remove = async (id, status) => {
+    if (status === 'claimed') {
+      toast.error('Cannot delete claimed items')
+      return
+    }
     if (!confirm('Delete this item permanently?')) return
     try {
       await api.delete(`/items/found/${id}`)
@@ -71,33 +75,39 @@ export default function AdminFoundItems() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((i) => (
-              <tr key={i.item_id} className="border-t border-brand-900/5 hover:bg-brand-50/30" data-testid={`admin-found-row-${i.item_id}`}>
-                <td className="p-3 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-brand-50 overflow-hidden shrink-0">
-                    {i.images?.[0] && <img src={i.images[0]} alt="" className="w-full h-full object-cover" />}
-                  </div>
-                  <div>
-                    <Link to={`/items/${i.item_id}`} className="font-semibold text-brand-900 hover:underline">{i.title}</Link>
-                    <div className="text-[10px] uppercase tracking-widest text-brand-900/50 mt-0.5">{i.item_id}</div>
-                  </div>
-                </td>
-                <td className="p-3"><span className="chip bg-brand-50 text-brand-900 border border-brand-900/10">{i.category}</span></td>
-                <td className="p-3 text-brand-900/70 hidden md:table-cell">{i.location_found}</td>
-                <td className="p-3"><span className={`chip status-${i.status}`}>{i.status}</span></td>
-                <td className="p-3 text-right whitespace-nowrap">
-                  <button onClick={() => setQrItem(i)} title="QR" data-testid={`qr-btn-${i.item_id}`} className="inline-grid place-items-center w-8 h-8 rounded-full hover:bg-brand-50">
-                    <QrCode className="w-4 h-4 text-brand-700" />
-                  </button>
-                  <Link to={`/admin/found/${i.item_id}/edit`} title="Edit" data-testid={`edit-btn-${i.item_id}`} className="inline-grid place-items-center w-8 h-8 rounded-full hover:bg-brand-50">
-                    <Edit className="w-4 h-4 text-brand-700" />
-                  </Link>
-                  <button onClick={() => remove(i.item_id)} title="Delete" data-testid={`del-btn-${i.item_id}`} className="inline-grid place-items-center w-8 h-8 rounded-full hover:bg-red-50">
-                    <Trash2 className="w-4 h-4 text-red-600" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {filtered.map((i) => {
+              const isClaimed = i.status === 'claimed'
+              return (
+                <tr key={i.item_id} className={`border-t border-brand-900/5 hover:bg-brand-50/30 ${isClaimed ? 'bg-green-50/30' : ''}`} data-testid={`admin-found-row-${i.item_id}`}>
+                  <td className="p-3 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-brand-50 overflow-hidden shrink-0">
+                      {i.images?.[0] && <img src={i.images[0]} alt="" className="w-full h-full object-cover" />}
+                    </div>
+                    <div>
+                      <Link to={`/items/${i.item_id}`} className="font-semibold text-brand-900 hover:underline">{i.title}</Link>
+                      <div className="text-[10px] uppercase tracking-widest text-brand-900/50 mt-0.5">{i.item_id}</div>
+                    </div>
+                  </td>
+                  <td className="p-3"><span className="chip bg-brand-50 text-brand-900 border border-brand-900/10">{i.category}</span></td>
+                  <td className="p-3 text-brand-900/70 hidden md:table-cell">{i.location_found}</td>
+                  <td className="p-3">
+                    <span className={`chip status-${i.status}`}>{i.status || 'open'}</span>
+                    {isClaimed && <div className="text-[10px] text-green-700 font-bold mt-1">✓ Resolved</div>}
+                  </td>
+                  <td className="p-3 text-right whitespace-nowrap">
+                    <button onClick={() => setQrItem(i)} title="QR" data-testid={`qr-btn-${i.item_id}`} className="inline-grid place-items-center w-8 h-8 rounded-full hover:bg-brand-50">
+                      <QrCode className="w-4 h-4 text-brand-700" />
+                    </button>
+                    <Link to={`/admin/found/${i.item_id}/edit`} title={isClaimed ? "Cannot edit claimed items" : "Edit"} data-testid={`edit-btn-${i.item_id}`} className={`inline-grid place-items-center w-8 h-8 rounded-full ${isClaimed ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-50'}`} onClick={(e) => isClaimed && e.preventDefault()}>
+                      <Edit className="w-4 h-4 text-brand-700" />
+                    </Link>
+                    <button onClick={() => remove(i.item_id, i.status)} title={isClaimed ? "Cannot delete claimed items" : "Delete"} data-testid={`del-btn-${i.item_id}`} disabled={isClaimed} className={`inline-grid place-items-center w-8 h-8 rounded-full ${isClaimed ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-50'}`}>
+                      <Trash2 className="w-4 h-4 text-red-600" />
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
