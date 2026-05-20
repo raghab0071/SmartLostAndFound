@@ -113,11 +113,16 @@ export default function HomePage() {
                         </div>
                         <div className="text-xs text-brand-900/60 mt-0.5">{s.d}</div>
                       </div>
+          
                     </li>
                   ))}
-                </ol>
+                </ol>        
               </div>
             </div>
+            <div className="mt-6 animate-pulse-slow text-center text-xs font-bold uppercase tracking-widest text-red-500">
+  If You See Any Lost Item In Campus, Please Help Us Return It To The
+  Campus Lost & Found Admin. You May Also Receive A Reward.
+</div>
           </div>
         </div>
       </section>

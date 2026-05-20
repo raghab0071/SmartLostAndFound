@@ -44,11 +44,11 @@ export default function Navbar() {
 
         <div className="ml-auto flex items-center gap-2">
           {/* Dark mode toggle */}
-          <button
+           <button
             data-testid="theme-toggle"
             onClick={toggleTheme}
             className="w-10 h-10 rounded-full grid place-items-center hover:bg-brand-50 transition"
-            title={isDark ? 'Light mode' : 'Dark mode'}
+            title={isDark ? 'Dark mode' : 'Light mode'}
           >
             {isDark ? (
               <Sun className="w-5 h-5 text-amber-500" />

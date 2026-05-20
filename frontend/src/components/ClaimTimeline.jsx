@@ -10,7 +10,7 @@ const STAGES = [
   { key: 'submitted', label: 'Submitted', icon: Sparkles },
   { key: 'verifying', label: 'Verifying', icon: Clock },
   { key: 'approved', label: 'Approved', icon: ShieldCheck },
-  { key: 'ready_for_pickup', label: 'Ready for Pickup', icon: Package },
+  { key: 'ready_for_pickup', label: 'Ready for Collect', icon: Package },
   { key: 'closed', label: 'Closed', icon: Check },
 ]
 

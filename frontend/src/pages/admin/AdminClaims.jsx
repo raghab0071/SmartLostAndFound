@@ -76,7 +76,7 @@ export default function AdminClaims() {
         ]
       case 'approved':
         return [
-          { key: 'ready', label: 'Mark ready for pickup', cls: 'btn-primary', icon: Package },
+          { key: 'ready', label: 'Mark ready for Collect', cls: 'btn-primary', icon: Package },
           { key: 'close', label: 'Mark collected', cls: 'btn-success', icon: PackageCheck },
         ]
       case 'ready_for_pickup':

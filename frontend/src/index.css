@@ -114,6 +114,18 @@ html.dark .card {
 .chip {
   @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium;
 }
+@keyframes slowBlink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.animate-pulse-slow {
+  animation: slowBlink 3s infinite;
+}
 
 /* Animated marquee */
 .marquee-track {
