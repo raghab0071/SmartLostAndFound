@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://smartlostandfound.onrender.com/api/$1"
+      "destination": "https://smartlostandfound-cqxn.onrender.com/api/$1"
     },
     {
       "source": "/emergent-api/(.*)",

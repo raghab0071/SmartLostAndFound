@@ -2,7 +2,7 @@ import urllib.request
 import json
 import urllib.error
 
-url = "https://smartlostandfound.onrender.com/api/auth/google/session"
+url = "https://smartlostandfound-cqxn.onrender.com/api/auth/google/session"
 data = json.dumps({"session_id": "dummy"}).encode("utf-8")
 req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
 try:

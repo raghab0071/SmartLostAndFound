@@ -1177,7 +1177,7 @@ app.add_middleware(
     allow_origins=[
         "https://smart-lost-and-found-1phw.vercel.app",
         "https://smart-lost-and-found-wine.vercel.app",
-        "https://smartlostandfound.onrender.com",
+        "https://smartlostandfound-cqxn.onrender.com",
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:5173",
