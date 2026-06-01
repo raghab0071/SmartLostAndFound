@@ -388,7 +388,6 @@ async def list_found_items(
         else:
             item_filter = {"posted_by_admin_id": user["user_id"]}
         if query:
-            # We avoid $and if possible. Since we already block $and in proxy, let's just fall back to Mongo
             query = {"$and": [item_filter, query]}
         else:
             query = item_filter
@@ -610,36 +609,43 @@ async def list_lost_items(
         # Students see only their own lost items
         query["reported_by_user_id"] = user["user_id"]
     elif user.get("role") == "admin":
-        # Admins see:
-        # ONLY institute-only reports matching their institute
-        # (NOT public reports - those are for homepage only)
+        # Admins see ALL lost items — both public and institute-only.
+        # They need full visibility to help students find their items.
         institute = user.get("institute")
         logger.info(f"Admin {user.get('user_id')} with institute '{institute}' fetching lost items")
-        
+
         if institute:
-            # Normalize institute name for comparison - escape special regex characters
+            # Show: all public reports (or missing visibility) + institute-only from same institute
             import re
-            institute_normalized = institute.strip().lower()
-            # Escape special regex characters
-            institute_escaped = re.escape(institute_normalized)
-            
-            # Match ONLY institute-only reports from same institute
+            institute_escaped = re.escape(institute.strip())
             query = {
-                "visibility": "institute_only",
-                "reported_by_institute": {"$regex": f"^{institute_escaped}$", "$options": "i"}
+                "$or": [
+                    {"visibility": "public"},
+                    {"visibility": {"$exists": False}},
+                    {"visibility": None},
+                    {
+                        "visibility": "institute_only",
+                        "reported_by_institute": {"$regex": f"^{institute_escaped}$", "$options": "i"}
+                    }
+                ]
             }
-            logger.info(f"Admin query with escaped regex: {query}")
         else:
-            # Admin without institute sees nothing
-            query = {"item_id": "NONE_WILL_MATCH"}  # Return empty result
-    
+            # Admin without institute set: show all public reports + items with no visibility set
+            query = {
+                "$or": [
+                    {"visibility": "public"},
+                    {"visibility": {"$exists": False}},
+                    {"visibility": None},
+                ]
+            }
+
     if status:
         if "$or" in query:
-            # If we already have $or, wrap everything in $and
+            # Wrap in $and to combine with status filter
             query = {"$and": [query, {"status": status}]}
         else:
             query["status"] = status
-    
+
     logger.info(f"Final query for user {user.get('user_id')}: {query}")
     cursor = db.lost_items.find(query, {"_id": 0}).sort("created_at", -1).limit(limit)
     items = await cursor.to_list(length=limit)
@@ -1042,6 +1048,15 @@ async def admin_dashboard_analytics(admin: dict = Depends(require_admin)):
     centres_list = await db.centres.find({"managed_by_admin_id": admin["user_id"]}, {"_id": 0, "centre_id": 1}).sort("created_at", -1).limit(100).to_list(length=100)
     centre_ids = [c["centre_id"] for c in centres_list if c.get("centre_id")]
 
+    # Build filter for found items this admin manages
+    if centre_ids:
+        found_filter = {"$or": [
+            {"posted_by_admin_id": admin["user_id"]},
+            {"centre_id": {"$in": centre_ids}}
+        ]}
+    else:
+        found_filter = {"posted_by_admin_id": admin["user_id"]}
+
     # If admin has no centres and hasn't posted any found items, return zeroed totals
     posted_count = await db.found_items.count_documents({"posted_by_admin_id": admin["user_id"]})
     if not centre_ids and posted_count == 0:
@@ -1060,18 +1075,17 @@ async def admin_dashboard_analytics(admin: dict = Depends(require_admin)):
             "weekly_trend": [{"day": d.strftime("%a"), "found": 0, "lost": 0} for d in [__import__('datetime').date.today() - __import__('datetime').timedelta(days=i) for i in range(6, -1, -1)]],
         }
 
-    # Filter for items this admin can see: either posted by them or in their centres
-    found_filter = {"posted_by_admin_id": admin["user_id"]}
-    if centre_ids:
-        found_filter = {"$or": [
-            {"posted_by_admin_id": admin["user_id"]},
-            {"centre_id": {"$in": centre_ids}}
-        ]}
-
     # Count found items
     found_total = await db.found_items.count_documents(found_filter)
-    open_found = await db.found_items.count_documents({**found_filter, "status": "open"})
-    returned = await db.found_items.count_documents({**found_filter, "status": "returned"})
+    # Build status-specific filters properly (can't use ** spread with $or filters)
+    if "$or" in found_filter:
+        open_filter = {"$and": [found_filter, {"status": "open"}]}
+        returned_filter = {"$and": [found_filter, {"status": "returned"}]}
+    else:
+        open_filter = {**found_filter, "status": "open"}
+        returned_filter = {**found_filter, "status": "returned"}
+    open_found = await db.found_items.count_documents(open_filter)
+    returned = await db.found_items.count_documents(returned_filter)
 
     # Count pending claims for items this admin manages
     item_ids = [item["item_id"] for item in await db.found_items.find(found_filter, {"_id": 0, "item_id": 1}).to_list(length=500)]
@@ -1087,8 +1101,30 @@ async def admin_dashboard_analytics(admin: dict = Depends(require_admin)):
         student_query = {"role": "student", "institute": admin.get("institute")}
         students = await db.users.count_documents(student_query)
 
-    # Count lost items reported by students in the admin's institute
-    lost_total = await db.lost_items.count_documents({"reported_by_institute": admin.get("institute")}) if admin.get("institute") else 0
+    # Count lost items visible to this admin (public + institute-only from same institute)
+    import re as _re
+    if admin.get("institute"):
+        institute_escaped = _re.escape(admin["institute"].strip())
+        lost_query = {
+            "$or": [
+                {"visibility": "public"},
+                {"visibility": {"$exists": False}},
+                {"visibility": None},
+                {
+                    "visibility": "institute_only",
+                    "reported_by_institute": {"$regex": f"^{institute_escaped}$", "$options": "i"}
+                }
+            ]
+        }
+    else:
+        lost_query = {
+            "$or": [
+                {"visibility": "public"},
+                {"visibility": {"$exists": False}},
+                {"visibility": None},
+            ]
+        }
+    lost_total = await db.lost_items.count_documents(lost_query)
 
     recovery_rate = round((returned / found_total) * 100, 1) if found_total else 0
 
@@ -1107,10 +1143,18 @@ async def admin_dashboard_analytics(admin: dict = Depends(require_admin)):
     days = [today - timedelta(days=i) for i in range(6, -1, -1)]
     trend = []
     for d in days:
-        # Count items created on this date (simplified - using string comparison)
         date_str = d.isoformat()
-        f_count = await db.found_items.count_documents({**found_filter, "created_at": {"$regex": f"^{date_str}"}})
-        l_count = await db.lost_items.count_documents({"reported_by_institute": admin.get("institute"), "created_at": {"$regex": f"^{date_str}"}}) if admin.get("institute") else 0
+        # Build date-filtered queries safely (avoid ** spread with $or filters)
+        if "$or" in found_filter:
+            f_day_filter = {"$and": [found_filter, {"created_at": {"$regex": f"^{date_str}"}}]}
+        else:
+            f_day_filter = {**found_filter, "created_at": {"$regex": f"^{date_str}"}}
+        if "$or" in lost_query:
+            l_day_filter = {"$and": [lost_query, {"created_at": {"$regex": f"^{date_str}"}}]}
+        else:
+            l_day_filter = {**lost_query, "created_at": {"$regex": f"^{date_str}"}}
+        f_count = await db.found_items.count_documents(f_day_filter)
+        l_count = await db.lost_items.count_documents(l_day_filter)
         trend.append({"day": d.strftime("%a"), "found": f_count, "lost": l_count})
 
     return {
@@ -1167,6 +1211,50 @@ async def health():
         }
     except Exception as e:
         return {"ok": False, "db_backend": db_backend, "error": str(e)}
+
+
+@api.get("/debug/admin-data")
+async def debug_admin_data(admin: dict = Depends(require_admin)):
+    """Debug endpoint — shows what data is visible to the current admin."""
+    admin_id = admin["user_id"]
+    institute = admin.get("institute")
+
+    # All found items posted by this admin
+    my_found = await db.found_items.find({"posted_by_admin_id": admin_id}, {"_id": 0, "item_id": 1, "title": 1, "status": 1, "centre_id": 1}).to_list(length=500)
+
+    # Centres managed by this admin
+    my_centres = await db.centres.find({"managed_by_admin_id": admin_id}, {"_id": 0, "centre_id": 1, "name": 1}).to_list(length=100)
+    centre_ids = [c["centre_id"] for c in my_centres]
+
+    # Found items in those centres
+    centre_found = []
+    if centre_ids:
+        centre_found = await db.found_items.find({"centre_id": {"$in": centre_ids}}, {"_id": 0, "item_id": 1, "title": 1, "status": 1, "centre_id": 1}).to_list(length=500)
+
+    # All lost items (what admin can see)
+    all_lost = await db.lost_items.find({}, {"_id": 0, "item_id": 1, "title": 1, "status": 1, "visibility": 1, "reported_by_institute": 1}).to_list(length=200)
+
+    # Total counts
+    total_found = await db.found_items.count_documents({})
+    total_lost = await db.lost_items.count_documents({})
+    total_users = await db.users.count_documents({})
+
+    return {
+        "admin_id": admin_id,
+        "admin_email": admin.get("email"),
+        "admin_institute": institute,
+        "my_centres": my_centres,
+        "my_found_items_count": len(my_found),
+        "my_found_items": my_found[:10],
+        "centre_found_items_count": len(centre_found),
+        "all_lost_items_count": len(all_lost),
+        "all_lost_items_sample": all_lost[:10],
+        "db_totals": {
+            "found_items": total_found,
+            "lost_items": total_lost,
+            "users": total_users,
+        }
+    }
 
 
 # ---------- SEED HOOK ----------
