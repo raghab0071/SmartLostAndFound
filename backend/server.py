@@ -1145,16 +1145,42 @@ async def root():
 
 @api.get("/health")
 async def health():
+    from db_proxy import _USE_SUPABASE, _mongo_db, MONGO_URL, DB_NAME
+    db_backend = "mongodb" if _mongo_db is not None else ("supabase" if _USE_SUPABASE else "json")
     try:
         await db.command("ping")
-        return {"ok": True}
+        # Count records to verify data is accessible
+        user_count = await db.users.count_documents({})
+        found_count = await db.found_items.count_documents({})
+        lost_count = await db.lost_items.count_documents({})
+        centre_count = await db.centres.count_documents({})
+        return {
+            "ok": True,
+            "db_backend": db_backend,
+            "db_name": DB_NAME,
+            "counts": {
+                "users": user_count,
+                "found_items": found_count,
+                "lost_items": lost_count,
+                "centres": centre_count,
+            }
+        }
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "db_backend": db_backend, "error": str(e)}
 
 
 # ---------- SEED HOOK ----------
 @app.on_event("startup")
 async def on_startup():
+    # Log which database backend is active
+    from db_proxy import _USE_SUPABASE, _mongo_db, MONGO_URL, DB_NAME
+    if _mongo_db is not None:
+        logger.info(f"✅ Database: MongoDB Atlas — {DB_NAME} (Supabase bypassed)")
+    elif _USE_SUPABASE:
+        logger.info("✅ Database: Supabase (no MongoDB configured)")
+    else:
+        logger.info("⚠️  Database: JSON files (no MongoDB or Supabase configured)")
+
     # Indexes are already created in Supabase schema.
     # No need to create them programmatically for the proxy backend.
 

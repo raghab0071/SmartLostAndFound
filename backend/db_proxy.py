@@ -26,8 +26,13 @@ JSON_DB_DIR = Path(os.getenv("JSON_DB_DIR", os.getenv("JSON_MIRROR_DIR", Path(__
 JSON_DB_DIR.mkdir(parents=True, exist_ok=True)
 JSON_PRIMARY = not MONGO_URL
 
+# Only use Supabase if it's explicitly enabled AND MongoDB is NOT configured.
+# When MongoDB is available, always prefer it — Supabase publishable keys are
+# blocked by RLS and return empty arrays silently, causing data to disappear.
+_USE_SUPABASE = bool(SUPABASE_URL and SUPABASE_KEY and not MONGO_URL)
+
 _supabase_client: Optional[httpx.AsyncClient] = None
-if SUPABASE_URL and SUPABASE_KEY and not JSON_PRIMARY:
+if _USE_SUPABASE:
     _supabase_client = httpx.AsyncClient(
         base_url=SUPABASE_URL.rstrip("/") + "/rest/v1",
         headers={
@@ -362,12 +367,13 @@ class CollectionProxy:
             logger.warning("Failed to mirror many to mongo: %s", exc)
 
     async def find_one(self, query: Dict[str, Any], projection: Optional[Dict[str, int]] = None):
-        try:
-            data = await self._supabase_select(query, sort=(), limit=1)
-            if data:
-                return _project_document(data[0], projection)
-        except Exception:
-            pass
+        if _USE_SUPABASE:
+            try:
+                data = await self._supabase_select(query, sort=(), limit=1)
+                if data:
+                    return _project_document(data[0], projection)
+            except Exception:
+                pass
         if _mongo_db is not None:
             collection = await self._mongo_collection()
             result = await collection.find_one(query, projection or {})
@@ -379,117 +385,131 @@ class CollectionProxy:
         return QueryProxy(self, query, projection)
 
     async def insert_one(self, document: Dict[str, Any]):
-        try:
-            result = await self._supabase_insert(document)
-            asyncio.create_task(self._mirror_to_mongo(document))
-            return result
-        except Exception:
-            if _mongo_db is None:
-                docs = self._json_read_all()
-                docs.append(_json_compatible(_without_id(document)))
-                self._json_write_all(docs)
-                return document
-            collection = await self._mongo_collection()
-            await collection.insert_one(_json_compatible(document))
+        if _USE_SUPABASE:
+            try:
+                result = await self._supabase_insert(document)
+                asyncio.create_task(self._mirror_to_mongo(document))
+                return result
+            except Exception:
+                pass
+        if _mongo_db is None:
+            docs = self._json_read_all()
+            docs.append(_json_compatible(_without_id(document)))
+            self._json_write_all(docs)
             return document
+        collection = await self._mongo_collection()
+        await collection.insert_one(_json_compatible(document))
+        return document
 
     async def insert_many(self, documents: List[Dict[str, Any]]):
-        try:
-            result = await self._supabase_insert(documents)
-            asyncio.create_task(self._mirror_many_to_mongo(documents))
-            return result
-        except Exception:
-            if _mongo_db is None:
-                docs = self._json_read_all()
-                docs.extend([_json_compatible(_without_id(doc)) for doc in documents])
-                self._json_write_all(docs)
-                return documents
-            collection = await self._mongo_collection()
-            await collection.insert_many([_json_compatible(doc) for doc in documents])
+        if _USE_SUPABASE:
+            try:
+                result = await self._supabase_insert(documents)
+                asyncio.create_task(self._mirror_many_to_mongo(documents))
+                return result
+            except Exception:
+                pass
+        if _mongo_db is None:
+            docs = self._json_read_all()
+            docs.extend([_json_compatible(_without_id(doc)) for doc in documents])
+            self._json_write_all(docs)
             return documents
+        collection = await self._mongo_collection()
+        await collection.insert_many([_json_compatible(doc) for doc in documents])
+        return documents
 
     async def update_one(self, query: Dict[str, Any], update_doc: Dict[str, Any]):
         supabase_patch, mongo_update = _prepare_update_docs(update_doc)
-        try:
-            if supabase_patch is None:
-                raise ValueError("Update operator requires Mongo fallback")
-            return await self._supabase_update(query, supabase_patch, many=False)
-        except Exception:
-            if _mongo_db is None:
-                docs = self._json_read_all()
-                modified = 0
-                for index, doc in enumerate(docs):
-                    if _matches_query(doc, query):
-                        docs[index] = _apply_mongo_update(doc, mongo_update)
-                        modified = 1
-                        break
-                if modified:
-                    self._json_write_all(docs)
-                return JsonWriteResult(modified_count=modified)
-            collection = await self._mongo_collection()
-            return await collection.update_one(query, mongo_update)
+        if _USE_SUPABASE:
+            try:
+                if supabase_patch is None:
+                    raise ValueError("Update operator requires Mongo fallback")
+                return await self._supabase_update(query, supabase_patch, many=False)
+            except Exception:
+                pass
+        if _mongo_db is None:
+            docs = self._json_read_all()
+            modified = 0
+            for index, doc in enumerate(docs):
+                if _matches_query(doc, query):
+                    docs[index] = _apply_mongo_update(doc, mongo_update)
+                    modified = 1
+                    break
+            if modified:
+                self._json_write_all(docs)
+            return JsonWriteResult(modified_count=modified)
+        collection = await self._mongo_collection()
+        return await collection.update_one(query, mongo_update)
 
     async def update_many(self, query: Dict[str, Any], update_doc: Dict[str, Any]):
         supabase_patch, mongo_update = _prepare_update_docs(update_doc)
-        try:
-            if supabase_patch is None:
-                raise ValueError("Update operator requires Mongo fallback")
-            return await self._supabase_update(query, supabase_patch, many=True)
-        except Exception:
-            if _mongo_db is None:
-                docs = self._json_read_all()
-                modified = 0
-                for index, doc in enumerate(docs):
-                    if _matches_query(doc, query):
-                        docs[index] = _apply_mongo_update(doc, mongo_update)
-                        modified += 1
-                if modified:
-                    self._json_write_all(docs)
-                return JsonWriteResult(modified_count=modified)
-            collection = await self._mongo_collection()
-            return await collection.update_many(query, mongo_update)
+        if _USE_SUPABASE:
+            try:
+                if supabase_patch is None:
+                    raise ValueError("Update operator requires Mongo fallback")
+                return await self._supabase_update(query, supabase_patch, many=True)
+            except Exception:
+                pass
+        if _mongo_db is None:
+            docs = self._json_read_all()
+            modified = 0
+            for index, doc in enumerate(docs):
+                if _matches_query(doc, query):
+                    docs[index] = _apply_mongo_update(doc, mongo_update)
+                    modified += 1
+            if modified:
+                self._json_write_all(docs)
+            return JsonWriteResult(modified_count=modified)
+        collection = await self._mongo_collection()
+        return await collection.update_many(query, mongo_update)
 
     async def delete_one(self, query: Dict[str, Any]):
-        try:
-            return await self._supabase_delete(query)
-        except Exception:
-            if _mongo_db is None:
-                docs = self._json_read_all()
-                kept = []
-                deleted = 0
-                for doc in docs:
-                    if deleted == 0 and _matches_query(doc, query):
-                        deleted = 1
-                        continue
-                    kept.append(doc)
-                if deleted:
-                    self._json_write_all(kept)
-                return JsonWriteResult(deleted_count=deleted)
-            collection = await self._mongo_collection()
-            return await collection.delete_one(query)
+        if _USE_SUPABASE:
+            try:
+                return await self._supabase_delete(query)
+            except Exception:
+                pass
+        if _mongo_db is None:
+            docs = self._json_read_all()
+            kept = []
+            deleted = 0
+            for doc in docs:
+                if deleted == 0 and _matches_query(doc, query):
+                    deleted = 1
+                    continue
+                kept.append(doc)
+            if deleted:
+                self._json_write_all(kept)
+            return JsonWriteResult(deleted_count=deleted)
+        collection = await self._mongo_collection()
+        return await collection.delete_one(query)
 
     async def delete_many(self, query: Dict[str, Any]):
-        try:
-            return await self._supabase_delete(query)
-        except Exception:
-            if _mongo_db is None:
-                docs = self._json_read_all()
-                kept = [doc for doc in docs if not _matches_query(doc, query)]
-                deleted = len(docs) - len(kept)
-                if deleted:
-                    self._json_write_all(kept)
-                return JsonWriteResult(deleted_count=deleted)
-            collection = await self._mongo_collection()
-            return await collection.delete_many(query)
+        if _USE_SUPABASE:
+            try:
+                return await self._supabase_delete(query)
+            except Exception:
+                pass
+        if _mongo_db is None:
+            docs = self._json_read_all()
+            kept = [doc for doc in docs if not _matches_query(doc, query)]
+            deleted = len(docs) - len(kept)
+            if deleted:
+                self._json_write_all(kept)
+            return JsonWriteResult(deleted_count=deleted)
+        collection = await self._mongo_collection()
+        return await collection.delete_many(query)
 
     async def count_documents(self, query: Dict[str, Any]) -> int:
-        try:
-            return await self._supabase_count(query)
-        except Exception:
-            if _mongo_db is None:
-                return len([doc for doc in self._json_read_all() if _matches_query(doc, query)])
-            collection = await self._mongo_collection()
-            return await collection.count_documents(query)
+        if _USE_SUPABASE:
+            try:
+                return await self._supabase_count(query)
+            except Exception:
+                pass
+        if _mongo_db is None:
+            return len([doc for doc in self._json_read_all() if _matches_query(doc, query)])
+        collection = await self._mongo_collection()
+        return await collection.count_documents(query)
 
     async def aggregate(self, pipeline: List[Dict[str, Any]]):
         return AggregateProxy(self, pipeline)
@@ -530,7 +550,7 @@ class QueryProxy:
         return self
 
     async def to_list(self, length: int = 100):
-        if _supabase_client:
+        if _USE_SUPABASE:
             try:
                 return await self.collection._supabase_select(self.query, sort=self._sort, limit=self._limit or length)
             except Exception:
